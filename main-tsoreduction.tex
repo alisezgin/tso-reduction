@@ -386,9 +386,75 @@ Both cases trivially satisfy the conditions of abstraction.
 A dual rule is to weaken assumptions, the rule {\aliabsrulex {WeakAssume}}.
 In this case, the assume statement with a weaker predicate will allow for more behaviors.
 
-Another rule, {\aliabsrulex {ValNondet}}, is non-deterministic reads or writes.
-Let $\alihavocval$ be an expression that can evaluate to any integer value.\footnote{Essentially, with the introduction of $\alihavocval$ we are changing the evaluation operator $\alieval$ into a set.}
+Another rule, {\aliabsrulex {ValNondet}}, introduces non-deterministic reads or writes.
+Let $\alihavocval$ be an expression that can evaluate to any integer value.
+\footnote{Essentially, with the introduction of $\alihavocval$ we are changing the evaluation operator $\alieval$ from a mapping from expressions to values to a mapping from expression to sets of values.}
 Then replacing any expression with $e$ with $\alihavocval$ is another abstraction.
+
+Finally, the rule {\aliabsrulex {CtrlNondet}}, introduces non-deterministic control flow.
+The idea is to replace a statement $s$ by an if-then-else statement such that the branches are not necessarily mutually exclusive, i.e. certain states may satisfy both $e$ and $e'$ of the rule in Table~\ref{tab:abs-rules}.
+This is a sound abstraction because no matter which branch is taken (and at any state at least one of these branches are enabled) whatever $s$ was doing, possibly more, in the original program will be done.  
+
+For a detailed exposition of how abstraction in conjunction with reduction leads to a natural style of reasoning in safety proofs, the reader is referred to \cite{EQT2009}.
+In the remainder of this section, we work through an example program which contains a triangular race and hence is not initially amenable to an SC analysis.
+We show how abstracting the program leads to a program which is SC-like.
+
+\begin{figure}[ht]
+\begin{alltt}DoubleCheckInit() 
+\{
+ r:=\(\alimem\)[Obj];
+ \(\aliif\) r=0 \(\alithen\) 
+ \{
+  \(\aliatomic\) \{ \(\aliassume\) {\(\alimem\)[l]=0}; \(\alimem\)[l]:=tid; \(\alifence\); \}
+  r:=\(\alimem\)[Obj];
+  \(\aliif\) r=0 \(\alithen\) \{ r:=NewIdx(); \(\alimem\)[Obj]:=r; \}
+  \(\alimem\)[l]:=0;
+ \}
+\}\end{alltt}
+\caption{The code for double check initialization. The parameter {\tt a} holds the address for {\tt Obj}.}
+\label{fig:double-check}
+\end{figure}
+
+
+\subsection{Example - Double Checked Initialization}
+\label{subsec:example-double-check}
+Consider the code given in Fig.~\ref{fig:double-check}, which is derived from double checked initialization.
+The objective of the procedure is to ensure that a shared object $Obj$ is initialized exactly once.
+In order to simplify presentation, we assume that $Obj$ fits in a single memory slot, addressed by {\alimemx {\tt Obj}}.
+
+The procedure starts by checking whether the object of interest $Obj$ has already been initialized.
+If $Obj$ has indeed been initialized, the procedure terminates.
+Otherwise, the procedure switches to the initialization phase.
+This phase starts by acquiring a (global) lock which protects the initialization operation on the object.
+If the lock is available, which is when {\alimemx{l}} is equal to 0, it is acquired by setting {\alimemx{l}} to the thread identifier of the current thread, {\tt tid}, and flushing the contents of the buffer ensuring the global visibility of the lock being acquired.
+Interestingly enough, this is the only place in the code where a fence is used.
+
+After successfully acquiring the lock, the current state of $Obj$ is checked again.
+This is necessary to ensure that no other (concurrent thread) has initialized $Obj$ in the meantime.
+If $Obj$ is initialized by some other thread, the lock is released by resetting {\alimemx{l}} back to 0 and the procedure terminates.
+Otherwise, a new memory slot is prepared and $Obj$ is assigned to this new slot, which is followed by the release of the lock and the termination of the procedure.
+
+\paragraph{Triangular race.}
+This code has a triangular race due to the first read of $Obj$, but before getting into that let us first discuss why the read of $Obj$ within the lock protected region does not lead to a triangular race.
+Let us use $R_1$ and $R_2$ to denote the first and second read statements of $\alimemx {\tt Obj}$. 
+Let $P$ be the program containing only {\tt DoubleCheckInit}.
+
+Let $\alisequencex r$ be a TSO-run of the form 
+\[
+\alisequencex r = q_0\tau_1\cdot\ q\xrightarrow{\textnormal{\sc\small Rd},t:R_2}q'\ \cdot\tau_2q_n
+\]
+For $\alisequencex r$ to contain a triangular race, one condition requires that $t$ have done a write on some variable other than that is read by $R_2$, i.e. a local write statement to a location different from {\tt Obj} in $\tau_1$.
+Such a write, the one that updates {\alimemx{l}} in order to acquire the lock, exists.
+The second condition requires that another thread write concurrently to {\alimemx{\tt Obj}} as the first transition in $\tau_2$.
+But clearly such a concurrent write cannot occur because all writes to {\alimemx{\tt Obj}} are protected by the lock and at the beginning of $\tau_2$, the thread $t$ holds the lock.
+Thus, had it not been for the first read $R_1$, this procedure would have been triangular race-free and SC-like.
+
+Now let us repeat the same consideration for $R_2$.
+Let the TSO-run $\alisequencex r$ be in the form
+\[
+\alisequencex r = q_0\tau_1\cdot\ q\xrightarrow{\textnormal{\sc\small Wr},t:W_l}\cdot\ \tau_2\ \cdot q'\xrightarrow{\textnormal{\sc\small 
+\]
+
 
 
 %%%%%%%%%%%%%%%%%%%%%
