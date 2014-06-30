@@ -1,0 +1,10 @@
+\begin{figure*}
+\begin{alltt}
+\(ReadL(e,r,l\sb{s})\) \{                                    \(ReadR(e,r,l\sb{s})\) \{          
+ \(\aliatomic\) \{                                    \(\aliatomic\) \{
+  if (UpdCntL[\(e\)][tid]>UpdCntR[\(e\)][tid])       r := ReadVal[\(l\sp{loc}\sb{s}\)];
+   \{\(r\) := \(e\sp{loc}\);\} \{\(r\) := \(\alimemx{e}\);\}                      \(l\sp{rem}\sb{s}\)++;
+ \}                                                \}
+ ReadVal[\(l\sp{loc}\sb{s}\)][tid] := \(r\);               \}
+\}\end{alltt}
+\end{figure*}

@@ -1,0 +1,605 @@
+%-----------------------------------------------------------------------------
+%
+%               Template for sigplanconf LaTeX Class
+%
+% Name:         sigplanconf-template.tex
+%
+% Purpose:      A template for sigplanconf.cls, which is a LaTeX 2e class
+%               file for SIGPLAN conference proceedings.
+%
+% Guide:        Refer to "Author's Guide to the ACM SIGPLAN Class,"
+%               sigplanconf-guide.pdf
+%
+% Author:       Paul C. Anagnostopoulos
+%               Windfall Software
+%               978 371-2316
+%               paul@windfall.com
+%
+% Created:      15 February 2005
+%
+%-----------------------------------------------------------------------------
+
+
+\documentclass[preprint,9pt]{sigplanconf}
+
+% The following \documentclass options may be useful:
+
+% preprint      Remove this option only once the paper is in final form.
+% 10pt          To set in 10-point type instead of 9-point.
+% 11pt          To set in 11-point type instead of 9-point.
+% authoryear    To obtain author/year citation style instead of numeric.
+
+\usepackage{amsmath,amssymb}
+\usepackage{mathrsfs}
+\usepackage{alltt}
+\usepackage{xspace}
+\usepackage{mathpartir}
+\usepackage{stmaryrd}
+
+\newcommand{\COMMENT}[1]{}
+
+\begin{document}
+
+\special{papersize=8.5in,11in}
+\setlength{\pdfpageheight}{\paperheight}
+\setlength{\pdfpagewidth}{\paperwidth}
+
+\conferenceinfo{POPL '15}{Month d--d, 20yy, City, ST, Country} 
+\copyrightyear{2015} 
+\copyrightdata{978-1-nnnn-nnnn-n/yy/mm} 
+\doi{nnnnnnn.nnnnnnn}
+
+% Uncomment one of the following two, if you are not going for the 
+% traditional copyright transfer agreement.
+
+%\exclusivelicense                % ACM gets exclusive license to publish, 
+                                  % you retain copyright
+
+%\permissiontopublish             % ACM gets nonexclusive license to publish
+                                  % (paid open-access papers, 
+                                  % short abstracts)
+
+\titlebanner{Reduction for TSO}        % These are ignored unless
+\preprintfooter{Reduction for TSO}   % 'preprint' option specified.
+
+\title{Reducing TSO to SC by Reduction}
+\subtitle{TSO Simplified}
+
+\authorinfo{Ismail Kuru\and Serdar Tasiran}
+           {Koc University}
+           {ikuru@ku.edu.tr/stasiran@ku.edu.tr}
+\authorinfo{Ali Sezgin}
+           {University of Cambridge}
+           {ali.sezgin@cl.cam.ac.uk}
+
+\maketitle
+
+\begin{abstract}
+A prominent way of analyzing programs written for relaxed memory models is to check whether it is sound, for the particular program under analysis, to assume sequential consistency (SC) which is perceived as the bare minimum for concurrent reasoning.
+The approach is based on establishing a {\em data race freedom} result, which essentially identifies for a given memory model the class of programs which cannot manifest non-SC behaviors.
+The total store ordering (TSO) memory model in particular has been fully characterized: a program will have a non-SC behavior if and only if it has a triangular data race.
+However, one is left to reason in the TSO world if the program fails to avoid those races.
+
+In this paper, we develop a methodology which transforms a program with races to one without. 
+Our framework is derived from QED, an abstraction-refinement approach based on Lipton's reduction theory.
+The main observation is that if one can systematically prove that each write to buffer and its associated flush from the buffer can be put together, then one can treat the whole program as SC.
+Putting together amounts to showing that actions have the correct mover types; e.g. each flush of a method is a left-mover.
+
+The presentation of the framework is done in two phases.
+In the first phase, we formulate sufficient conditions under which a program can be transformed into another by using a class of abstraction operators. 
+This formulation is done via an argument based on the whole set of executions of the program .
+In the second phase, how most of these ideas can be captured in a local reasoning style, very similar to QED.
+We illustrate our approach on various examples which are also mechanically verified by our tool, QED4TSO.
+\end{abstract}
+
+\category{CR-number}{subcategory}{third-level}
+
+% general terms are not compulsory anymore, 
+% you may leave them out
+\terms
+program verification
+
+\keywords
+reduction, total-store ordering, sequential consistency, race freedom, safety checking 
+
+\section{Introduction}
+\label{sec:intro}
+Both TSO and SC give the allusion that the thread-local program order is respected for memory accesses.
+Unlike SC where updates are assumed to take effect instantaneously over all threads, in TSO updates are observably split into two: a locally visible update and an instantaneous remote update not necessarily simultaneous with the local update.
+In formal models, this split is captured by a thread local queue in which local updates are inserted as soon as the local update occurs; entries are removed from the queue asynchronously and non-deterministically updating a single global shared memory. 
+This queue is traditionally known as the store buffer.
+
+It has been showed that it is possible to ignore the relaxed memory effects (relative to SC) if one adheres to a particular style of programming. 
+Generally referred to under the heading data race freedom, these programs cannot distinguish whether they are running on an SC architecture or something weaker. 
+If a relaxed memory model is proved to have this property, then proving correctness for data race free programs reduces to proving correctness under SC.
+For TSO, such a theorem was proven for a class of programs, called TRF (triangular race free): a program cannot distinguish SC from TSO iff it is TRF~\cite{Owe2010}.
+
+As for the programs that fall out of this class, and there are many more of them, the proof efforts are centered around the simplification of reasoning associated with the effect of the store buffer on the execution.
+Typically, one converts a TSO program into an equivalent one which has an additional unbounded buffer per thread modeling the asynchronous remote updates. 
+Methodologies consequently differ on how they simplify the reasoning. 
+It could involve reducing the points where asynchronous updates can happen~\cite{AK20XX} or bounding the size of the buffer~\cite{BYZ20XX}.
+So far no work has tried to cross the gap between these two classes of programs in a uniform manner.
+
+\newcommand{\dontcare}{\ensuremath{\star}}
+\newcommand{\genmemaccess}{\ensuremath{\mathsf{M}}}
+\newcommand{\genmemaccesstso}{\ensuremath{\genmemaccess_{TSO}}}
+\newcommand{\genread}{\ensuremath{\mathsf{R}}}
+%\newcommand{\genreadtso}{\ensuremath{\genread_{TSO}}}
+\newcommand{\aliwrite}{\ensuremath{\mathsf{W}}}
+\newcommand{\aliwritex}[3]{\ensuremath{\aliwrite_{#1}(#2/#3)}}
+\newcommand{\aliread}{\ensuremath{\mathsf{R}}}
+\newcommand{\alireadx}[3]{\ensuremath{\aliread_{#1}(#2/#3)}}
+%\newcommand{\locwrite}{\ensuremath{\aliwrite^{\mathscr{L}}}}
+\newcommand{\locwrite}{\ensuremath{\aliwrite^{\mathsf{l}}}}
+\newcommand{\locwritex}[3]{\ensuremath{\locwrite_{#1}(#2/#3)}}
+%\newcommand{\remwrite}{\ensuremath{\aliwrite^{\mathscr{R}}}}
+\newcommand{\remwrite}{\ensuremath{\aliwrite^{\mathsf{r}}}}
+\newcommand{\remwritex}[3]{\ensuremath{\remwrite_{#1}(#2/#3)}}
+\newcommand{\alibarrier}{\ensuremath{\mathsf{B}}}
+\newcommand{\alibarrierx}[1]{\ensuremath{\alibarrier_{#1}}}
+\newcommand{\alilock}{\ensuremath{\mathsf{L}}}
+\newcommand{\alilockx}[1]{\ensuremath{\alilock_{#1}}}
+\newcommand{\aliunlock}{\ensuremath{\mathsf{U}}}
+\newcommand{\aliunlockx}[1]{\ensuremath{\aliunlock_{#1}}}
+
+
+\newcommand{\alitrue}{\ensuremath{\mathit{true}}}
+\newcommand{\alifalse}{\ensuremath{\mathit{false}}}
+
+
+
+\section{Overview}
+In this section we are going to walk through several examples illustrating the main concepts of our approach.
+The discussion will be necessarily kept at a semi-formal level; all relevant formal definitions are given in the following sections.
+We start by explaining how one reasons about TSO programs using reduction.
+
+\paragraph{Reduction for TSO.}
+%A TRF program does not allow for an execution with the following prefix \cite{Owe2010}:
+Consider a sequence of memory accesses done by two threads, $t$ and $u$, given as:
+\[
+{\aliwritex t y 1}\ \cdot\ {\alireadx t x 0}\ \cdot\ {\aliwritex u x 2}
+\]
+%Informally, this represents a sequence with an arbitrary sequence of memory operations followed by a write to $y$ by thread $t$ followed by a (possibly empty) sequence of reads done by $t$ followed by a read to $x$ followed by a write $x$ by a different thread $u$.
+This represents a sequence of a write to $y$ by thread $t$, followed by a read to $x$ again by thread, followed by a write to $x$ by thread $u$.
+
+To see why this is a {\em bad} (distinguishing) sequence for TSO, we will refer to an alternative characterization of memory accesses in TSO.
+We represent read accesses as usual, but change the way write accesses are represented.
+We split each write access $W$ into two distinct accesses, {\locwrite} and {\remwrite}.
+Each sequence over simple memory accesses as given above will be identified with a set of sequences over the new alphabet such that i) each {\aliwrite} is replaced with {\locwrite}, ii) each {\locwrite} has a matching {\remwrite} such that the thread local order among {\locwrite}'s is preserved by their associated {\remwrite}'s.
+For instance, the following sequence is one possible TSO-expansion of the SC-sequence above.
+\[
+{\locwritex t y 1}\ \cdot\ {\alireadx t x 0}\ \cdot\ {\locwritex u x 2}\ \cdot\ {\remwritex u x 2}\ \cdot\ {\remwritex t y 1}
+\]
+Observe that the ordering between the remote updates to $y$ and $x$ is the opposite of the ordering between their corresponding local updates. 
+Intuitively this means that the order of updates to $x$ and $y$ as seen by $t$ ($y$ precedes $x$) and the order seen by a different thread $v$ ($x$ precedes $y$) will be different, which is impossible under SC.
+
+We show that a similar characterization can be obtained using reduction arguments.
+An execution can be generated under SC if it is possible to {\em move} all local and their matching remote updates next to each other without changing the end state of the execution.
+For the example above, the question is whether it is possible to move either $\remwritex t y \dontcare$ to the left of every possible concurrent action or $\locwritex t y \dontcare$ to the right of every possible concurrent action.
+The trace above itself is not problematic because both remote writes are left-movers. 
+In other words, the above trace is equivalent to the following:
+\[
+{\locwritex t y 1}\,\cdot\,{\remwritex t y 1}\,\cdot\,{\alireadx t x 0}\,\cdot\,{\locwritex u x 2}\,\cdot\,{\remwritex u x 2}
+\]
+However, in the presence of other writes such a transformation can become impossible.
+Consider for instance
+\begin{eqnarray*}
+&{\locwritex t y 1}\,\cdot\,{\alireadx t y 1}\,\cdot\,{\alireadx t x 0}\,\cdot\,{\locwritex u x 2}\,\cdot\,{\alireadx u x 2}\,\cdot\,{\alireadx u y 0}\\
+&\cdot\ {\remwritex u x 2}\,\cdot\,{\remwritex t y 1}
+\end{eqnarray*}
+It is possible to move the local and remote writes to $x$ done by thread $u$ without changing the values read.
+However, it is impossible to make the local and remote writes to $y$ done by thread $t$ without changing one of the reads: if $\remwritex t y 1$ is to the left of $\locwritex u x 2$, the read of $y$ by thread $u$ will return 1 instead of 0; if the $\locwritex t y 1$ is to the right of $\locwritex u x 2$, the read of $x$ by thread $t$ will return 2 instead of 0.
+
+\begin{figure}[t]
+\begin{alltt}
+Recv()          Send(d)
+ while (R);      while (!R);
+ d := Data;      Data := d;
+ R := \(\alitrue\);       R := \(\alifalse\);
+ return d;\end{alltt}
+\caption{A binary synchronous rendez-vous with two threads.}
+\label{fig:rendez-vous}
+\end{figure}
+Consider a simple template for a binary synchronous rendez-vous message passing as given in Fig.~\ref{fig:rendez-vous}.
+There are two methods, {\tt Recv} and {\tt Send}.
+The receiver method {\tt Recv} spins for the flag {\tt R} until it is set to false.
+Once that happens, it reads the value stored in {\tt Data}, resets {\tt R} to true and returns the value it has read.
+The sender method {\tt Send} operates dually: it spins on {\tt R} until it is set to true, updates the value in {\tt Data} and resets {\tt R} to false.
+
+Recall that a write can be treated as atomic if for any execution in which both its local and remote updates occur, one can find an equivalent execution in which they occur consecutively. 
+For instance, if we want to show that the write to {\tt R} done by {\tt Recv} is atomic, we have to show that if the following is an execution
+\[
+A\,\cdot\,{\locwritex t R {\alitrue}}\,\cdot\,B\,\cdot\,{\remwritex t R {\alitrue}}
+\]
+there is a partitioning of $B$ into $B_1$ and $B_2$ such that
+\[
+A\,\cdot\,B_1\,\cdot\,{\locwritex t R {\alitrue}}\,\cdot\,{\remwritex t R {\alitrue}}\,\cdot\,B_2
+\]
+is also an execution.
+One can construct such an execution because i) one can always move a local update to the right of other thread's actions, ii) there cannot be any remote updates to $R$ in the sequence of accesses represented by $B$, iii) thus it is safe to move any reads of $R$ done by a subsequent call to {\tt Send} all of which will return {\alitrue}.
+Thus setting $B_1=B$ and $B_2=\varepsilon$ gives the desired execution.
+Similar arguments are used to prove that all the write accesses in Fig.~\ref{fig:rendez-vous} are atomic.
+
+\paragraph{Abstracting memory accesses.}
+
+\paragraph{Transforming TSO into SC.}
+
+\paragraph{Local analysis for reduction.}
+Once the program is transformed, one can appeal to the reduction theorems for TSO.
+
+
+Our contributions are:
+\begin{itemize}
+\item Formal reasoning framework for TSO programs based on reduction.
+\item Systematic abstraction of a program so that the transformed has no SC-distinguishing executions and is free of assertion violations only if the original program is free of assertion violations.
+\item Structural transformation of a TSO program which has the same behavior under SC.
+\item Local and modular reduction framework for transformed programs.
+\end{itemize}
+
+\newcommand{\tsoalph}{\ensuremath{\Sigma}}
+\newcommand{\aliprojx}[2]{\ensuremath{#1\downarrow_{#2}}}
+\newcommand{\aliperm}{\ensuremath{\sim_{\pi}}}
+\newcommand{\alipotso}{\ensuremath{<^{tso}}}
+\newcommand{\alipotsox}[1]{\ensuremath{\alipotso_{#1}}}
+\newcommand{\aliposc}{\ensuremath{<^{sc}}}
+\newcommand{\aliposcx}[1]{\ensuremath{\aliposc_{#1}}}
+\newcommand{\alimatch}{\ensuremath{\mu}}
+\newcommand{\alimatchx}[1]{\ensuremath{\alimatch(#1)}}
+
+\newtheorem{definition}{Definition}
+\newtheorem{proposition}{Proposition}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proof}{Proof}
+
+\input{formal-framework}
+
+\newcommand{\alisplit}{\ensuremath{\mathsf{Split}}}
+\newcommand{\alisplitx}[1]{\ensuremath{\alisplit(#1)}}
+\newcommand{\alisplitprogx}[1]{\ensuremath{#1^S}}
+\newcommand{\aliloctrans}{\ensuremath{\tau_{l}}}
+\newcommand{\aliloctransx}[1]{\ensuremath{\aliloctrans(#1)}}
+\newcommand{\aliremtrans}{\ensuremath{\tau_{r}}}
+\newcommand{\aliremtransx}[1]{\ensuremath{\aliremtrans(#1)}}
+\newcommand{\aliequivgeneric}{\ensuremath{\simeq}}
+
+\section{Reduction for TSO}
+\label{sec:reduction-for-tso}
+In this section, we explain how the reduction theory of Lipton can be used for TSO.
+Our goal is to present sufficient conditions for programs such that when a program satisfies these conditions the program is guaranteed to be unable to distinguish TSO semantics from SC semantics. 
+This is the first step of applying reduction to TSO programs.
+In the following sections, we will show how we can extend the applicability of the same approach for programs which are initially TSO distinguishing.
+
+\begin{definition}[Movers]
+\label{def:movers}
+Let $P$ be a labelled program and let $\aliequivgeneric$ be an equivalence relation over $\alirunsx {tso} P$.
+Let $s$ be a statement that occurs in some method's body $m$ of $P$.
+Then, $s$ is {\em left-mover in $\aliequivgeneric$} if for any $\alisequencex r=\alisequencex r[1]\ldots\alisequencex r[k]\in\alirunsx {tso} P$ we have $\alisequencex r[i]\alisequencex r[i+1]=(R',t':s')(R,t:s)$ such that $\alimemtracex {s'} \alipotsox {\alimemtracex {\alisequencex r}} \alimemtracex s$ does not hold, then there exists a run $\alisequencex {r'}$ in $[\alisequencex r]_{\aliequivgeneric}$ such that $\alisequencex {r'}\langle 1,i\rangle=\alisequencex r\langle 1,i-1\rangle \alisequencex r[i+1]$.
+
+Similarly, $s$ is {\em right-mover in $\aliequivgeneric$} if for any $\alisequencex r=\alisequencex r[1]\ldots\alisequencex r[k]\in\alirunsx {tso} P$ we have $\alisequencex r[i-1]\alisequencex r[i]=(R,t:s)(R',t':s')$ such that $\alimemtracex {s} \alipotsox {\alimemtracex {\alisequencex r}} \alimemtracex {s'}$ does not hold, then there exists a run $\alisequencex {r'}$ in $[\alisequencex r]_{\aliequivgeneric}$ such that $\alisequencex {r'}\langle 1,i\rangle=\alisequencex r\langle 1,i-2\rangle \alisequencex r[i]\alisequencex r[i-1]$.
+\end{definition}
+
+Intuitively, $s$ is left mover (resp. right mover) if reordering $s$ before (resp. after) any other statement that is concurrent with $s$ does not change the behavior (all runs belonging to the same equivalence have the same behavior).
+In the classic definition of reduction, the equivalence relation requires that the two sequences be permutations of each other and that the end states are identical, which corresponds to $\tsoequivstrict$ in the TSO context.
+The reason for the added generality will become clear once we generalize reduction with abstraction.
+
+Our first result about movers follows immediately from definitions.
+\begin{lemma}
+Let $P$ be a labelled program.
+All of its TSO runs are SC-like if all remote writes are left-movers in $\tsoequivstrict$.
+Dually, all of its TSO runs are SC-like if all local actions (excluding remote writes) are right-movers in $\tsoequivstrict$.
+
+All of its TSO runs are observationally SC-like if all remote writes are left-movers in $\tsoequiv$.
+Dually, all of its TSO runs are observationally SC-like if all local actions (excluding remote writes) are right-movers in $\tsoequiv$.
+\end{lemma}
+This result depends on a strong constraint which is unlikely to be satisfied by many programs.
+In what follows we will provide a series of incrementally more general results.
+Fix a labelled program $P=\{m_1,\ldots,m_n\}$.
+\begin{lemma}
+All TSO runs of $P$ are SC-like if for each method $m_i$, either all of its local actions are right-movers in $\tsoequivstrict$ or all of its remote write actions are left-movers. 
+\end{lemma}
+This result helps us to reason about methods individually.
+We have the following corollary, which is also implied by triangular-race freedom of \cite{Owe2009}.
+\begin{corollary}
+Let $P$ be such that each $m_i$ either only updates the shared memory (no read actions) or only reads shared memory (no write actions).
+Then all of its TSO runs are SC-like.
+\end{corollary}
+
+Now we will investigate the impact of placing fence statements in restricting the non-SC-like behaviors of programs.
+For the following fix $s^{loc}$ and $s$ as matching local and remote write actions.
+\begin{lemma}
+If in any TSO run in which $s^{loc}$ is executed by some thread $t$, all the combined write actions executed by $t$ up to the occurrence of $s^{loc}$ are atomic and $s$ is left-mover, then $s^{loc}$ and $s$ are atomic.
+\end{lemma}
+This naturally leads to the following special instance which gives an insight about how fence statements lead to SC-like programs.
+\begin{corollary}
+If in any TSO run in which $s^{loc}$ is executed by thread $t$, there exists a fence action executed by $t$ preceding $s^{loc}$, no other local write actions by $t$ occur between the two actions and $s$ is left-mover, then $s^{loc}$ and $s$ are atomic.
+\end{corollary}
+This means that, unlike the general case, in order to argue that a write immediately following a fence statement is atomic, we only need to prove that its matching remote write action is left-mover. 
+There is a dual of this result which we state next.
+\begin{lemma}
+If in any TSO run in which $s^{loc}$ is executed by thread $t$, there does not exist any read action executed by $t$ until the occurrence of $s$, then $s^{loc}$ is right-mover and $s^{loc}$ and $s$ are atomic.
+\end{lemma}
+The next result which is a special case of the previous result explains why the use of fence statements restricts the runs of a TSO program to SC-like behaviors.
+\begin{corollary}
+Let $s;C;\alifence$ be a code block in some $m_i$ such that $C$ does not contain any read of shared memory (no statements of the form $r:=\alimemx e$).
+Then $s$ and all the writes in $C$ are atomic.
+\end{corollary}
+
+
+{\sc Code snippets demonstrating the results.}
+
+\newcommand{\aliabsrulex}[1]{\textnormal{\sc\small #1}}
+\newcommand{\alihavocval}{\ensuremath{\star}}
+
+\section{Abstracting TSO programs}
+\label{sec:abstracting-tso-programs}
+The main problem with the existing body of work on TSO program verification is the impossibility of handling programs which do contain non SC-like runs, i.e. programs with triangular races.
+Our approach so far allows us to at least alleviate some of the difficulties in reasoning by showing that certain write statements can be taken to be atomic.
+In this section, we go one step further and show abstraction can be used to turn a non-SC-like TSO program into one that is SC-like.
+
+The use of abstraction in reduction was successfully demonstrated in~\cite{EQT2009} in the context of sequentially consistent programs.
+Since the soundness of the method crucially depends on the atomicity of each action, it was not clear how one can adopt those techniques to weaker memory models.
+Here we address and resolve the issue of non-atomic writes for TSO.
+
+\begin{definition}[Program Abstraction]
+Let $P$ and $P'$ be two programs.
+We say that $P'$ {\em abstracts} $P$, if one of the following holds:
+\begin{itemize}
+\item $P'$ has a failed run, or
+\item $P$ does not have a failed run and for each terminated run $\alisequencex r\in\alirunsx {tso} P$, there exists a run $\alisequencex {r'}\in\alirunsx {tso} {P'}$ such that $\alimemtracex {\alisequencex r} = \alimemtracex {\alisequencex {r'}}$.
+\end{itemize}
+\end{definition}
+Intuitively, $P'$ abstract $P$ if $P'$ contains an assertion violation or has more behaviors than $P$.
+This means that if $P'$ can be proven to contain no assertion violations, then neither does $P$.
+We should note that the other direction, that when $P$ does not contain an assertion violation neither should $P'$, does not hold in general.
+
+\begin{table}
+\begin{tabular}{ll}
+$\aliabsrulex {InsertAssert}$ & $s \leadsto \aliatomicx {\aliassertx e; s}$\\
+$\aliabsrulex {WeakAssume}$ & $\aliassumex e \leadsto \aliassumex e'$\\
+& \{provided $e\Rightarrow e'$\}\\
+$\aliabsrulex {ValNondet}$ & $r := \alimemx e \leadsto r := \alihavocval$\\
+& $r := e \leadsto r := \alihavocval$\\ 
+& $\alimemx e := r \leadsto \alimemx e := \alihavocval$\\
+$\aliabsrulex {CtrlNondet}$ & 
+ \begin{tabular}[t]{ll}
+ $s \leadsto$ & $\aliif\ {\alihavocval}$\\
+ & $\alithen\ \mathtt{\{}\aliassumex e; s'\mathtt{\}}$\\
+ & $\alielse\ \mathtt{\{}\aliassumex e'; s''\mathtt{\}}$\\
+ & \{provided $e\vee e'$ is tautology, and\\ 
+ & $s'$ and $s''$ are abstractions of $s$\}
+\end{tabular}
+\end{tabular}
+\caption{Substitution rules guaranteeing sound abstraction.}
+\label{tab:abs-rules}
+\end{table}
+
+\paragraph{Abstraction rules.}
+There are many ways to ensure that a syntactic manipulation of $P$ results in another program $P'$ abstracting the former.
+In Table~\ref{tab:abs-rules}, we list several rules which are essentially individual statement replacements that provide a sound abstraction.
+
+The first substitution rule, {\aliabsrulex {InsertAssert}}, is the insertion of an assertion to any statement. 
+Recall that an assert statement either does nothing (if its predicate evaluates to true) or results in a failed run.
+Both cases trivially satisfy the conditions of abstraction.
+
+A dual rule is to weaken assumptions, the rule {\aliabsrulex {WeakAssume}}.
+In this case, the assume statement with a weaker predicate will allow for more behaviors.
+
+Another rule, {\aliabsrulex {ValNondet}}, is non-deterministic reads or writes.
+Let $\alihavocval$ be an expression that can evaluate to any integer value.\footnote{Essentially, with the introduction of $\alihavocval$ we are changing the evaluation operator $\alieval$ into a set.}
+Then replacing any expression with $e$ with $\alihavocval$ is another abstraction.
+
+
+%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%stopped here
+%%%%%%%%%%%%%%%%%%%%%
+
+
+
+%%%%%%%%%%%%%
+%%%the following should go into the QED section where we describe how SC based analysis tools 
+%%%can be used to decide the mover types of remote or local write actions.
+%%%%%%%%%%%%%
+\COMMENT{
+We begin by describing a transformation which maps TSO programs to {\em equivalent} SC programs.
+We should emphasize that our construction does not employ explicit arrays, but rather implicitly models the locally ordered buffered writes by simulating each thread with two threads.
+The SC program enables us to apply reduction directly.
+In particular, we show how mover types of certain statements can be used to conclude that a program cannot have any TSO distinguishing behavior.
+Finally, we define an abstraction relation among TSO programs.
+This abstraction forms the pillar of a reasoning methodology which enables one to start with a program with TSO distinguishing behavior and to end with a more abstract program which is SC-like.
+
+
+\begin{figure*}
+\begin{tabular}{p{.4\textwidth}p{.3\textwidth}p{.3\textwidth}}
+\begin{alltt}\(ReadL(e,r,l\sb{s})\) \{\COMMENT{ \(\aliatomic\) \{   }                                 
+ if (UCntL[\(e\)][tid]>UCntR[\(e\)][tid])       
+  \{\(r\) := \(e\sp{loc}\);\} \{\(r\) := \(\alimemx{e}\);\}                      
+ ReadVal[\(l\sp{loc}\sb{s}\)][tid] := \(r\);               
+ \(l\sp{loc}\sb{s}\)[tid]++;
+\}
+
+\(ReadR(e,r,l\sb{s})\) \{
+ \(\aliassume\) \(l\sp{rem}\sb{s}\)[tid] < \(l\sp{loc}\sb{s}\)[tid];
+ r := ReadVal[\(l\sp{rem}\sb{s}\)][tid];
+ \(l\sp{rem}\sb{s}\)[tid]++;
+\}
+\end{alltt} &
+
+\begin{alltt}\(WriteL(e,r,l\sb{s})\) \{
+ \(e\sp{loc}\) := \(e\);
+ \(l\sp{loc}\sb{s}\)[tid]++;
+ UCntL[\(e\)][tid]++;
+
+\(WriteR(e,s,l\sb{s})\) \{
+ \(\aliassume\) \(l\sp{rem}\sb{s}\)[tid] < \(l\sp{loc}\sb{s}\)[tid];
+ \(\alimemx{e}\) := WriteVal[\(l\sp{loc}\sb{s}\)][tid];
+ \(l\sp{rem}\sb{s}\)[tid]++;
+ UCntR[\(e\)][tid]++;
+\}\end{alltt} & 
+
+\begin{alltt}
+\(FenceL\) \{
+ \(\aliassume \forall e.\) 
+   UCntL[\(e\)][tid]
+        ==
+   UCntR[\(e\)][tid];
+\}
+
+\(FenceR\) \{
+ \(\aliskip\);
+\}\end{alltt}
+\end{tabular}
+\caption{The TSO to SC transformation macros.}
+\label{fig:transformation-macros}
+\end{figure*}
+
+\subsection{Program transformation.}
+\label{subsec:program-transformation}
+Let $P=(\{M_1,\ldots,M_n\},\alilabel)$ be a labeled program.
+For notational convenience, we let $l_s$ to denote the label $l$ of $s$, i.e. $\alilabelx s=l$.
+The {\em split transformation} of $P$ is another program $\alisplitprogx P=(\{M^{loc}_1,M^{rem}_1,\ldots,M^{loc}_n,M^{rem}_n\},\alilabel')$, whose components are explained below.
+
+Let $s$ be a statement in $M_i$.
+The {\em local transformation} and the {\em remote transformation} of $s$, written as $\aliloctransx s$ and $\aliremtransx s$ respectively, are given below:
+\begin{eqnarray*}
+ \aliloctransx s  & \stackrel{def}{=} &
+  \begin{cases}
+   \aliatomicx {ReadL(e,r,l_s)} & , s=r:=\alimemx e\\
+   \aliatomicx {WriteL(e,r,l_s)} & , s=\alimemx e:= r\\
+   \aliatomicx {FenceL} & , s=\alifence\\
+   s & , \textnormal{otherwise}
+  \end{cases}\\
+ \aliremtransx s & \stackrel{def}{=} &
+  \begin{cases}
+   \aliatomicx {ReadR(e,r,l_s)} & , s=r:=\alimemx e\\
+   \aliatomicx {WriteR(e,r,l_s)} & , s=\alimemx e:= r\\
+   \aliatomicx {FenceR} & , s=\alifence\\
+   s & , \textnormal{otherwise}
+  \end{cases}
+\end{eqnarray*}
+By convention, we let $\aliloctransx \varepsilon=\aliremtransx \varepsilon=\varepsilon$.
+
+These transformations are used to implicitly represent the store buffer.
+The local transformation of a read statement $r\mathtt{:=}\alimemx e$ checks whether the latest update to $\alimemx e$ by this thread is still in its buffer.
+If so, the value to be read from the buffer is mimicked by reading the new auxiliary variable $e^{loc}$ as seen by this thread.
+Otherwise, the value is read from the memory, i.e. the contents of $\alimemx e$.
+
+Both of these transformations are extended to code blocks respecting the program order.
+Formally, if $C=s;C'$ is a code block, $\aliloctransx C$ and $\aliremtransx C$ are given by $\aliloctransx s; \aliloctransx {C'}$ and $\aliremtransx s; \aliremtransx {C'}$, respectively.
+This way we identify each method $M_i=\{C_i\}$ with two methods $M^{loc}_i=\{\aliloctransx {C_i}\}$ and $M^{rem}_i=\{\aliremtransx {C_i}\}$ by applying $\aliloctrans$ and $\aliremtrans$ to each statement in $M_i$.
+}
+\COMMENT{
+We call an SC run of $\alisplitprogx P$ {\em well-formed} if 
+\begin{itemize}
+\item it admits a partitioning $\aliloctransx T$ and $\aliremtransx T$ of $T$ such that $t\in\aliloctransx T$ iff 
+\item there is a bijection $\mu$ among the set of thread and method pairs $(t,m)$ such that if $\mu(t,m)=(t',m')$, then $t$ is executing $m$ , $t'$ is executing $m'$, $t\neq t'$ and there is a method $\hat{m}$ with $m=\aliloctransx \hat{m}$ and $m'=\aliremtransx \hat{m}$.
+\end{itemize}
+}
+
+\COMMENT{
+%Intuitively, a well-formed run will have both the local and remote copy of a method (never only one of them)
+The transformation as defined is both sound and complete which is given as the main result of this section.
+
+
+\begin{theorem}
+Let $P$ be a labelled program.
+The TSO runs of $P$ and the SC runs of $\alisplitprogx P$ are isomorphic up to the rearrangement of the initialization of the remote methods, $M^{rem}_i$.
+\end{theorem}
+\begin{proof}[Sketch]
+Let $\alisequencex r$ be a TSO run of $P$.
+Then a run of $\alisplitprogx P$ is constructed by replacing all {\sc\small Init} transitions done by $t$ for method $m$ with an {\sc\small Init} transition done by $t^{loc}$ for $m^{loc}$ immediately followed by another {\sc\small Init} transition done by $t^{rem}$ for $m^{rem}$.
+All local write transitions {\sc\small WrB} by $t$ are replaced with {\sc\small Wr} transitions by $t^{loc}$.
+Similarly all buffered write transitions {\sc\small WrM} by $t$ are replaced with {\sc\small Wr} transitions by $t^{rem}$.
+Each fence transition due to statement $s$ of $m$ by $t$ is replaced with $\aliremtransx s$ of $m^{rem}$ by $t^{rem}$.
+By an inductive argument, in such cases the predicate in the assume instruction of $\aliremtransx s$ evaluates to true.
+
+The construction in the other direction first moves all initialization transitions {\sc\small Init} of remote copies, i.e. $m^{rem}$ by some $t^{rem}$ immediately after its associated {\sc\small Init} transition of $m^{loc}$.
+The replacement of the initialization of 
+\end{proof}
+}
+
+%We now present a mapping which will output another program $P'$ such that there exists a bijection between $\alirunsx {tso} P$ and $\alirunsx {sc} P$. 
+
+\section{Speaking Locally - QED and TSO}
+
+\section{Reduction for Other Relaxed Memory Models}
+
+\section{Conclusion}
+
+
+\appendix
+\section{Appendix Title}
+
+This is the text of the appendix, if you need one.
+
+\acks
+
+Acknowledgments, if needed.
+
+% We recommend abbrvnat bibliography style.
+
+\bibliographystyle{abbrvnat}
+
+% The bibliography should be embedded for final submission.
+
+\begin{thebibliography}{}
+\softraggedright
+
+\bibitem[Smith et~al.(2009)Smith, Jones]{smith02}
+P. Q. Smith, and X. Y. Jones. ...reference text...
+
+\end{thebibliography}
+
+
+\end{document}
+
+
+
+
+\COMMENT{
+Observe that according to Def.~\ref{def:movers}, in order to prove that a statement $s$ is a left-mover we only need to check whether $s$ moves to the left of those statements with which $s$ can simultaneously execute. 
+Let us consider a particular instance where $s^{loc}$ is a local write action executed by thread $t$, $s$ is its matching remote write action, and all occurrences of $s^{loc}$ are preceded by a fence statement executed by $t$.
+This means that between $s^{loc}$ and $s$ there could be no remote write actions done by $t$.
+This in turn implies that if $s$ is left-mover, then the combined write action is atomic.
+}
+
+
+ 
+
+
+\COMMENT{
+
+\begin{definition}[Movers]
+Let $\mathbf{E}$ be a set of TSO-executions, and $\aliequivgeneric$ be an equivalence relation over $\mathbf{E}$.
+Let $a$ be some TSO action that occurs in some TSO-execution in $\mathbf{E}$.
+Then, $a$ is called a {\em left mover per $\aliequivgeneric$} if for any TSO-execution $\mathbf{e}\in\mathbf{E}$ in which $a$ occurs, there is another TSO-execution $\mathbf{e}'\in\mathbf{E}$ such that $\mathbf{e}\aliequivgeneric\mathbf{e}'$ and each occurrence of $a$ in $\mathbf{e}'$ is either immediately preceded by actions that precede $a$ in $\alipotsox {\mathbf{e}'}$ or the first action in $\mathbf{e}'$.
+
+Similarly, $a$ is called a {\em right mover per $\aliequivgeneric$} if for any TSO-execution $\mathbf{e}\in\mathbf{E}$ in which $a$ occurs, there is another TSO-execution $\mathbf{e}'\in\mathbf{E}$ such that $\mathbf{e}\aliequivgeneric\mathbf{e}'$ and each occurrence of $a$ in $\mathbf{e}'$ is either immediately followed by actions that succeed $a$ in $\alipotsox {\mathbf{e}'}$ or the last action in $\mathbf{e}'$.
+\end{definition}
+
+The preceding definition is more general than the classical definition of reduction which fixes the interpretation of $\aliequivgeneric$: two executions are equivalent if they have identical end-states.
+The reason for the added flexibility should become clear when we introduce abstraction for programs.
+However, we will drop the mention of the equivalence relation whenever it is irrelevant to the discussion or clear from the context.
+
+Typically, one relies on an inductive argument to show that a particular action is a mover.
+Let $\mathbf{e}$ be a TSO-execution in $\mathbf{E}$.
+We say that $\mathbf{e}[i]$ moves to the left of $\mathbf{e}[i-1]$ if there is a TSO-execution $\mathbf{e}'$ such that $\mathbf{e}\aliequivgeneric\mathbf{e}'$, $\mathbf{e}\langle 1,i-2\rangle\cdot\mathbf{e}[i]=\mathbf{e}'\langle 1,i-1\rangle$ and $|\mathbf{e}|\geq|\mathbf{e}'|$.
+Intuitively, we stay in the same equivalence class by moving $\mathbf{e}[i]$ one step to the left (towards the beginning of the sequence). 
+Then, if one can show that a particular action $a$ moves to the left of all actions $b$ that can immediately precede $a$ except for those $c$ such that $c\alipotsox {\mathbf{e}} a$, then $a$ will be shown to be a left-mover in that equivalence class.
+%These arguments will be readily used to argue the mover types of statements of a program.  
+
+\begin{lemma}
+Let $\mathbf{e}$ be a TSO-execution and let $A_r$ denote the set of actions $\{\mathbf{e}[i] \mid \mathbf{e}[i]\in\tsoalph_{\remwrite,-,-}\}$ and $A_l$ denote the set of actions $\{\mathbf{e}[i] \mid \mathbf{e}[i]\in\tsoalph_{\locwrite,-,-}\}$.
+If each action in $A_r$ is a left-mover or each action in $A_l$ is a right-mover in $[\mathbf{e}]_{\tsoequiv}$, then $\mathbf{e}$ is SC-like.
+\end{lemma}
+
+Thus, it is sufficient to show that all remote write actions are left-movers or all local write actions are right-movers to conclude that a TSO-execution is SC-like.
+It is possible to weaken the condition further as follows.
+
+\begin{corollary}
+
+\end{corollary}
+
+
+}
