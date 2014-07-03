@@ -29,12 +29,13 @@
 % 11pt          To set in 11-point type instead of 9-point.
 % authoryear    To obtain author/year citation style instead of numeric.
 
-\usepackage{amsmath,amssymb}
+\usepackage{amsmath,amssymb,amsthm}
 \usepackage{mathrsfs}
 \usepackage{alltt}
 \usepackage{xspace}
 \usepackage{mathpartir}
 \usepackage{stmaryrd}
+\usepackage{xcolor}
 
 \newcommand{\COMMENT}[1]{}
 
@@ -63,7 +64,7 @@
 \preprintfooter{Reduction for TSO}   % 'preprint' option specified.
 
 \title{Reducing TSO to SC by Reduction}
-\subtitle{TSO Simplified}
+%\subtitle{TSO Simplified}
 
 \authorinfo{Ismail Kuru\and Serdar Tasiran}
            {Koc University}
@@ -75,21 +76,27 @@
 \maketitle
 
 \begin{abstract}
-A prominent way of analyzing programs written for relaxed memory models is to check whether it is sound, for the particular program under analysis, to assume sequential consistency (SC) which is perceived as the bare minimum for concurrent reasoning.
+A prominent way of analyzing programs written for relaxed memory models is to check whether it is sound, for the particular program under analysis, to assume sequential consistency (SC) which is taken to be the tractability threshold for concurrent reasoning.
 The approach is based on establishing a {\em data race freedom} result, which essentially identifies for a given memory model the class of programs which cannot manifest non-SC behaviors.
-The total store ordering (TSO) memory model in particular has been fully characterized: a program will have a non-SC behavior if and only if it has a triangular data race.
-However, one is left to reason in the TSO world if the program fails to avoid those races.
+The total store ordering (TSO) memory model in particular has been fully characterized: a program will be SC-like, i.e. without any non-SC behaviors, if and only if it is triangular race free.
+Unfortunately, checking whether a program has a triangular race belongs, even when constrained to finite data domains, is in {\sc PSpace}.
+Furthermore it is unclear what one is to do except for reasoning in full TSO semantics if the program fails to avoid those races.
 
-In this paper, we develop a methodology which transforms a program with races to one without. 
-Our framework is derived from QED, an abstraction-refinement approach based on Lipton's reduction theory.
-The main observation is that if one can systematically prove that each write to buffer and its associated flush from the buffer can be put together, then one can treat the whole program as SC.
-Putting together amounts to showing that actions have the correct mover types; e.g. each flush of a method is a left-mover.
+In this paper, we tackle the problem of TSO program analysis possibly in the presence of triangular races.
+We begin by generalizing Lipton's reduction theory, which hitherto has been restricted to SC, for TSO programs.
+We define a TSO operational semantics in which every write is split into two actions, write into the buffer and its flush from the buffer.
+We show how {\em moving} these actions towards each other, hence proving the atomicity of each write, is enough to prove that a TSO program is SC-like.
 
-The presentation of the framework is done in two phases.
-In the first phase, we formulate sufficient conditions under which a program can be transformed into another by using a class of abstraction operators. 
-This formulation is done via an argument based on the whole set of executions of the program .
-In the second phase, how most of these ideas can be captured in a local reasoning style, very similar to QED.
-We illustrate our approach on various examples which are also mechanically verified by our tool, QED4TSO.
+We then undertake the class of TSO programs with triangular races.
+We define an abstraction relation among TSO programs: $P'$ abstracts $P$ if every behavior of $P$ is also a behavior of $P'$.
+In essence, abstraction aims at removing conflicts between read and write actions resulting in less conflict among actions.
+Less conflict in turn leads to having more actions of the desired mover type.
+We illustrate the use of abstraction by transforming a sender/receiver implementation with triangular race to one without. 
+
+We also show how our approach can be mechanized.
+To this end, we present a transformation, interesting in its own right, from TSO programs to provably equivalent SC programs.
+The idea is to simulate the behavior of each thread running under TSO semantics by two tightly coupled threads running under SC semantics.
+By using this tranformation, we mechanically verify the atomicity, hence SC equivalence, of double checked initialization.
 \end{abstract}
 
 \category{CR-number}{subcategory}{third-level}
@@ -251,7 +258,9 @@ Our contributions are:
 \newtheorem{lemma}{Lemma}
 \newtheorem{corollary}{Corollary}
 \newtheorem{theorem}{Theorem}
-\newtheorem{proof}{Proof}
+%\newtheorem{proof}{Proof}
+
+%\newenvironment{proof}{\bf{Proof.\,\,}\rm}{$\hspace*{\fill}\Box$\par}
 
 \input{formal-framework}
 
@@ -394,13 +403,386 @@ Then replacing any expression with $e$ with $\alihavocval$ is another abstractio
 Finally, the rule {\aliabsrulex {CtrlNondet}}, introduces non-deterministic control flow.
 The idea is to replace a statement $s$ by an if-then-else statement such that the branches are not necessarily mutually exclusive, i.e. certain states may satisfy both $e$ and $e'$ of the rule in Table~\ref{tab:abs-rules}.
 This is a sound abstraction because no matter which branch is taken (and at any state at least one of these branches are enabled) whatever $s$ was doing, possibly more, in the original program will be done.  
-
 For a detailed exposition of how abstraction in conjunction with reduction leads to a natural style of reasoning in safety proofs, the reader is referred to \cite{EQT2009}.
-In the remainder of this section, we work through an example program which contains a triangular race and hence is not initially amenable to an SC analysis.
-We show how abstracting the program leads to a program which is SC-like.
+
+\paragraph{Why it works?}
+Before going into examples, let us briefly discuss how abstraction leads to an SC-like program. 
+Consider the template of a triangular race as given in~\cite{Owe2010} below:
+\begin{eqnarray*}
+&\locwritex t A 1 \cdot \alireadx t B 0 \cdot \locwritex u B 2 \cdot \remwritex u B 2\\
+&\ \cdot\ \alireadx v B 2 \cdot \alireadx v A 0 \cdot \remwritex t A 1
+\end{eqnarray*}
+In this TSO-execution, $t$ observes the initial value for $B$, whereas $v$ observes the write to $B$ by $u$ before the write to $A$ by $t$ because the remote write action of $t$ comes after both of the reads of $v$.
+In order to construct an equivalent SC-execution, both statements of $t$ should precede the statement of $u$ because the read of $B$ by $t$ returns the initial value 0.
+However, for the reads of $v$ to be consistent the write to $B$ should occur before the write to $A$, which contradicts the previous requirement.
+
+Looking more closely into the execution, we see that it is impossible to make the write to $A$ by $t$ atomic. 
+Recall that for a local and remote write pair to be atomic, it must be possible to partition into two the sequence of actions that separate the two write actions such that the local write moves to the right of every action of the left partition and the remote write moves to the left of every action of the right partition.
+In the given memory trace, $\locwritex t A 1$ is a right-mover but is followed by a read of $B$ which cannot move to the right of $\remwritex u B 2$.
+This implies that $\remwritex t A 1$ should move to the left of every action up to $\locwritex u B 2$.
+But this is impossible because it cannot move to the left of $\alireadx v A 0$.
+
+Now consider the abstraction which removes the read of $B$ by $t$.
+In other words, if the read of $B$ by $t$ is due to the statement $s$={\tt \aliregx 1:=$B$}, consider the program obtained by replacing $s$ with {\tt \aliregx 1:=\alihavocval}.
+This essentially removes the read of $B$ by $t$ from the memory trace since the abstract read does not depend on any write.
+This in turn means that instead of the above execution, we will have the following:
+\begin{eqnarray*}
+&\locwritex t A 1 \cdot \locwritex u B 2 \cdot \remwritex u B 2\\
+&\ \cdot\ \alireadx v B 2 \cdot \alireadx v A 0 \cdot \remwritex t A 1
+\end{eqnarray*}
+which can be brought into an atomic equivalent form as:
+\begin{eqnarray*}
+&\locwritex u B 2 \cdot \remwritex u B 2\\
+&\ \cdot\ \alireadx v B 2 \cdot \alireadx v A 0 \cdot \locwritex t A 1 \cdot \remwritex t A 1
+\end{eqnarray*}
+Of course, this is a simple example where the read value by $t$ is not used, so the abstraction might make sense trivially. 
+We next work through several simple templates which demonstrate the power of abstraction: transforming a program into one that is SC-like which can be used to prove safety properties of interest.
+ 
+\subsection{Send/Receive}
+\label{subsec:send-receive}
+
+\begin{figure}[h]
+\begin{tabular}{p{.2\textwidth}p{.2\textwidth}}
+\begin{alltt}Recv()
+ \(Rdy\):=1;
+ r[2]:=\(Buf\);
+ if r[2]=0 then
+   r[1]:=\(Flag\);
+   while r[1]=0 
+     r[1]:=\(Flag\);
+   r[2]:=\(Buf\);\end{alltt}
+&
+\begin{alltt}Send(\(d\))
+ \(Buf\):=\(d\);
+ r[1]:=\(Rdy\);
+ while r[1]=0 
+   r[1]:=\(Rdy\);
+ \(Flag\):=1;\end{alltt}
+\end{tabular}
+\caption{Sender/Receiver template with a triangular race.}
+\label{fig:send-receive}
+\end{figure}
+
+Consider the code given in Fig.~\ref{fig:send-receive}, which represents a standard synchronization pattern, where a sender sets a flag after having prepared its message.
+The intended operation proceeds as follows:
+The sender begins by preparing the message (represented by writing $d$ into $Buf$), and then spins on $Rdy$.
+After observing $Rdy$ equal to 1 it sends the message ready signal by setting $Flag$ to 1.
+The receiver begins by setting $Rdy$ (initially 0) to 1 to tell the sender that it is ready to receive a message.
+Before spinning on $Flag$, the receiver reads the current content of $Buf$ (0 means message not in yet).
+If it observes a non-zero value denoting a valid message, it skips the entire spinning block.
+Otherwise, it spins on $Flag$ and after observing it to be equal to 1, it reads the message from $Buf$.
+Let us consider the set of TSO programs in which two threads $t$ and $u$ run {\tt Recv} and {\tt Send(42)} respectively.
+
+\paragraph{Triangular race.}
+This program does have a triangular race depicted by the following memory trace
+\begin{eqnarray*}
+& \locwritex t {Rdy} 1 \cdot\ \alireadx t {Buf} 0\cdot\ \locwritex u {Buf} d \cdot\ \remwritex u {Buf} d\\
+&\cdot\ \alireadx u {Rdy} 0\cdot\ \remwritex t {Rdy} 1
+\end{eqnarray*}
+The first three actions, the local write to $Rdy$ and read of $Buf$ by $t$ followed by a write to $Buf$ by $u$ gives the triangular race.
+The remaining part of the execution shows how the race can be extended into a non SC-like run. 
+
+\paragraph{Removing the triangular race.}
+Following the discussion about the general case regarding triangular races, one might be tempted to abstract the read of $Buf$ by $t$ altogether.
+However, that would make the rest of the code behave incorrectly since a non-zero value for $Buf$ means a valid message which need not be equal to what $u$ is about to write, $d$.
+
+Let us instead consider the following abstraction for the statement {\tt $\aliregx 2$:=$Buf$}:
+\begin{eqnarray*}
+&&\aliif\ {\alihavocval}\\
+&&\alithen\ \aliatomicx {\aliassumex {Buf=0};\ \aliregx 2:=Buf;}\\
+&&\alielse\ \aliatomicx {\aliassumex {Buf\neq0};\ \aliregx 2:=\alihavocval;}
+\end{eqnarray*}
+This replacement is an instance of {\sc\small CtrlNondet} and thus leads to a sound abstraction.
+We claim that in the new abstract program $P'$ the write to $Rdy$ by {\tt Recv} is atomic.
+%In order to prove this claim we have to show that the memory trace of any run of $P'$ has an equivalent SC-execution.
+Let $\alisequencex r$ be a run in $\alirunsx {tso} {P'}$ whose memory trace is of the form
+\[
+\alpha\cdot\ \locwritex t {Rdy} 1\cdot\ \tau\cdot\ \remwritex t {Rdy} 1\cdot\ \beta
+\]
+where $\alpha$, $\tau$ and $\beta$ are sequences of memory actions.
+We have to show that there are sequences of actions $\tau_1$ and $\tau_2$ such that $\tau=\tau_1\tau_2$, $\locwritex t {Rdy} 1$ moves to the right of every action in $\tau_1$, and $\remwritex t {Rdy} 1$ moves to the left of every action in $\tau_2$. 
+We set $\tau_1=\tau$ and $\tau_2=\varepsilon$ and show that the following memory trace belongs to a run of $P'$.
+\[
+\alpha\cdot\ \tau\cdot\ \locwritex t {Rdy} 1\cdot\ \remwritex t {Rdy} 1\cdot\ \beta
+\]
+
+First, observe that $\tau_1$ cannot contain the write to $Flag$ by $u$ because that action only happens when $u$ ends its spinning by reading 1 from $Rdy$ which can only happen in $\beta$, i.e. after the remote write action $\remwritex t {Rdy} 1$.
+This in turn means that the farthest $t$ can go in $\tau$ is the reading of $Flag$.
+Any read action is a right (and left) mover with respect to another action not writing to the location read.
+Thus, in case $\tau_1$ contains read(s) of $Flag$ they can all move to right until $\remwritex t {Rdy} 1$.
+
+Since a local write action is always a right mover, we are left with the read of $Buf$ by $t$.
+If the remote write action $\remwritex u {Buf} d$ is not in $\tau$, then we are done.
+Assume that \remwritex u {Buf} d happens after some prefix $\tau_p$ of $\tau$, i.e.
+\[
+\alpha\cdot\ \locwritex t {Rdy} 1\cdot\ \tau_p\cdot\ \remwritex u {Buf} d\cdot\ \tau_q\cdot\ \remwritex t {Rdy} 1\cdot\ \beta
+\]
+If the read of $Buf$ by $t$ happens in $\tau_q$, we are done.
+So assume that the read of $Buf$ happens in $\tau_p$.
+Since it happens before the remote write action, the state at which the abstract read statement occurs must have $Buf=0$.
+According to the abstraction, this means that the {\tt then} branch must have been taken, which sets $\aliregx 2$ to 0.
+If the read action moves to the right of $\remwritex u {Buf} d$, then because $Buf\neq 0$ holds after the remote write, the {\tt else} branch will be taken instead.
+That in turn implies that $\aliregx 2$ can be assigned any value, including 0. 
+So, the sequence
+\[
+\alpha\cdot\ \cdot\ \tau_p'\cdot\ \remwritex u {Buf} d\cdot\ \tau_q'\cdot\ \locwritex t {Rdy} 1\cdot\ \remwritex t {Rdy} 1\cdot\ \beta
+\]
+where $\tau_p'$ does not contain any action by $t$ is also a memory trace of $P'$.
+Since $\tau$ was taken to be arbitrary, we conclude that the write to $Rdy$ by $t$ is atomic.
+
+\paragraph{Execution context.}
+Observe that our argument also establishes the remote write action to $Buf$ as a left mover. 
+However, there is a fundamental difference between the two arguments.
+Since we proved the atomicity of the write to $Rdy$ by showing that all actions of $t$ until the remote write action to $Rdy$ occurs are right-movers, our result does not depend on the client's state, in particular the store buffer state. 
+On the other hand, because our argument for the atomicity of the write to $Buf$ is based on showing that its remote write action is a left-mover, the result depends on the client's store buffer state. 
+For instance, if both threads' buffers contained remote write actions to the same location before calling {\tt Recv} and {\tt Send} then we will not be able to move the remote write to $Buf$ next to its matching local write.
+In other words, if one wants to have atomicity of these writes in any execution context, {\tt Recv} must end with a fence whereas {\tt Send} must begin with a fence.
+
+
+\section{Mechanical Verification of Write Atomicity}
+\label{sec:mechanical-verification}
+In this section, we show how the atomicity of a write can be mechanically checked.
+We begin by describing a transformation which maps TSO programs to {\em equivalent} SC programs.
+The asynchronous nature of the buffered updates is captured by a splitting of each thread into two threads, one representing the local operations, the other representing the remote operations.
+The queue semantics of each store buffer is captured by program order enforced by SC.
+The results we have presented thus far are used to verify the atomicity of any statement  in the transformed program under SC semantics.
+We illustrate our methodology by verifying the atomicity of writes in double checked initialization. 
+%In particular, we show how mover types of certain statements can be used to conclude that a program cannot have any TSO distinguishing behavior.
+%Finally, we define an abstraction relation among TSO programs.
+%This abstraction forms the pillar of a reasoning methodology which enables one to start with a program with TSO distinguishing behavior and to end with a more abstract program which is SC-like.
+
+
+\begin{figure*}
+\begin{tabular}{p{.35\textwidth}p{.3\textwidth}p{.34\textwidth}}
+\begin{alltt}\(RdL(e,r,l)\) \{  
+ st:=StExec[\(l\)][tid]+1;
+ ver:=AdrVer[\(e\)][tid];
+ if ver>AdrVer[\(e\)][tido]
+ then \{\(r\):=WrVal[e][ver][tid]; \}
+ else \{\(r\):=mem[\(e\)];
+ RdVal[l][st][tid]:=r;
+ StExec[\(l\)][tid]:=st;
+\}
+
+\(RdR(r,l)\) \{
+ st:=StExec[\(l\)][tid]+1;
+ \(\aliassume\) st<=StExec[\(l\)][tido];
+ r := RdVal[\(l\)][st][tido];
+ StExec[\(l\)][tid]:=st;
+\}
+\end{alltt} &
+
+\begin{alltt}\(WrL(e,r,l)\) \{
+ st:=StExec[\(l\)][tid]+1;
+ ver:=AdrVer[\(e\)][tid]+1;
+ WrVal[\(e\)][ver][tid]:=r;
+ AdrVer[\(e\)][tid]:=ver;
+ StExec[\(l\)][tid]:=st;
+\}
+
+\(WrR(e,l)\) \{
+ st:=StExec[\(l\)][tid]+1;
+ \(\aliassume\) st<=StExec[\(l\)][tido];
+ ver:=AdrVer[\(e\)][tid]+1;
+ mem[e]:=WrVal[\(e\)][st][tido];
+ AdrVer[\(e\)][tid]:=ver;
+ StExec[\(l\)][tid]:=st;
+\}\end{alltt} & 
+
+\begin{alltt}
+\(FenceL\) \{
+ \(\aliassume \forall e.\) 
+   AdrVer[\(e\)][tid]
+        ==
+   AdrVer[\(e\)][tido];
+\}
+
+\(FenceR\) \{
+ \(\aliskip\);
+\}\end{alltt}
+\end{tabular}
+\caption{The TSO to SC transformation macros.}
+\label{fig:transformation-macros}
+\end{figure*}
+
+\subsection{Program Transformation}
+\label{subsec:program-transformation}
+Let $P=(\{M_1,\ldots,M_n\},\alilabel)$ be a labeled program.
+For notational convenience, we let $l_s$ to denote the label $l$ of $s$, i.e. $\alilabelx s=l$.
+The {\em split transformation} of $P$ is another program $\alisplitprogx P=(\{M^{loc}_1,M^{rem}_1,\ldots,M^{loc}_n,M^{rem}_n\},\alilabel')$, whose components are explained below.
+
+In order to explicitly split the local and remote writes, we introduce several arrays:
+\begin{itemize}
+\item {\tt AdrVer[$i$][$t$]} holds the version number of updates to $\alimemx i$ by thread $t$.
+\item {\tt WrVal[$i$][$v$][$t$]} holds the value written to $\alimemx i$ with version number $v$ by thread $t$.
+\item {\tt RdVal[$i$][$v$][$t$]} holds the value read from $\alimemx i$ by $t$ with version number $v$.
+\item {\tt StExec[$l$][$t$]} holds the number of times the statement with label $l$ is executed by $t$.
+%\item {\tt Other[$t$]} holds the thread identifier matching with $t$ (see below).
+\end{itemize}
+
+Let $s$ be a statement in $M_i$.
+The {\em local transformation} and the {\em remote transformation} of $s$, written as $\aliloctransx s$ and $\aliremtransx s$ respectively, are given below:
+\begin{eqnarray*}
+ \aliloctransx s  & \stackrel{def}{=} &
+  \begin{cases}
+   \aliatomicx {RdL(e,r,l_s)} & , s=r:=\alimemx e\\
+   \aliatomicx {WrL(e,r,l_s)} & , s=\alimemx e:= r\\
+   \aliatomicx {FenceL} & , s=\alifence\\
+   s & , \textnormal{otherwise}
+  \end{cases}\\
+ \aliremtransx s & \stackrel{def}{=} &
+  \begin{cases}
+   \aliatomicx {RdR(e,r,l_s)} & , s=r:=\alimemx e\\
+   \aliatomicx {WrR(e,r,l_s)} & , s=\alimemx e:= r\\
+   \aliatomicx {FenceR} & , s=\alifence\\
+   s & , \textnormal{otherwise}
+  \end{cases}
+\end{eqnarray*}
+By convention, we let $\aliloctransx \varepsilon=\aliremtransx \varepsilon=\varepsilon$.
+The definitions of the macros $RdL$, $RdR$, etc. are given in Fig.~\ref{fig:transformation-macros}.
+Both of these transformations are extended to code blocks respecting the program order.
+Formally, if $C=s;C'$ is a code block, $\aliloctransx C$ and $\aliremtransx C$ are given by $\aliloctransx s; \aliloctransx {C'}$ and $\aliremtransx s; \aliremtransx {C'}$, respectively.
+This way we identify each method $M_i=\{C_i\}$ with two methods $M^{loc}_i=\{\aliloctransx {C_i}\}$ and $M^{rem}_i=\{\aliremtransx {C_i}\}$ by applying $\aliloctrans$ and $\aliremtrans$ to each statement in $M_i$.
+
+
+Intuitively, this transformation separates local writes from remote writes by way of adding a new auxiliary thread.
+The execution of method $m_i$ by some thread $t$ will be simulated by the execution of the methods $\tau_l(m_i)$ and $\tau_r(m_i)$ by threads $t$ and $t'$, respectively.
+All statement macros keep track of how many times a statement with label $l$ is executed, the value in {\tt StExec[$l$][tid]}.
+
+\paragraph{Read macros.}
+A read statement $s=r:=\alimemx e$ by $t$ is simulated by $t$ executing $\aliatomicx{RdL(e,r,l_s)}$ and $t'$ executing $\aliatomicx{RdR(r,l_s)}$.
+The local read starts by reading the execution count for $s$ and update count to {\alimemx e} by $t$.
+It then checks whether it should read from the {\em buffer} or from the {\em memory}.
+If the number of updates done by $t$ (local write actions) and the number of updates done by $t'$ (remote write actions) are equal, then memory is read; otherwise, the latest local write to $\alimemx e$ is read, the value in {\tt WrVal[$e$][ver][$t$]}.
+It registers the value it read with the current execution count into {\tt RdVal[$l_s$][st][$t$]}.
+It ends with updating the statement execution count.
+
+A remote read starts by reading the execution count of $s$ by $t'$.
+It then makes sure that the current statement is enabled by checking whether the remote execution count of $s$ is at most equal to local execution count of the same statement (by $t$).
+If the assumption is satisfied, then the value as read by the local thread, the value in {\tt RdVal[$l_s$][st][$t$]}, is assigned to $r$.
+It ends with updating the statement execution count.
+
+Note that, since all macros are within {\aliatomic} blocks, either the whole macro executes or none of it. 
+This implies that the remote read macro can only execute after its associated local read macro has executed.
+An alternative transformation would be to make the local and remote read operations tightly coupled: each local read macro is immediately followed by its associated remote read macro.
+This would have the advantage of avoiding the assume statement for read macros.
+For the sake of uniformity, though, since such assume statements are essential in capturing the asynchronous nature of remote writes, we opted for this encoding.
+
+\paragraph{Write macros.}
+A write statement $s=\alimemx e:=r$ by $t$ is simulated by $t$ executing $\aliatomicx{WrL(e,r,l_s)}$ and $t'$ executing $\aliatomicx{WrR(e,l_s)}$.
+The local write starts by reading the current statement count $c$ for $s$ and update count $v$ to {\alimemx e} by $t$.
+It then registers the current update value into {\tt WrVal[$e$][$v$][$t$]}.
+It ends with updating the update and statement execution counts.
+
+The remote write starts by reading the current statement count $c$ for $s$ by $t'$.
+It then ensures that the current macro is enabled by checking that the number of times the local counterpart of the statement is executed is at least as big as $c$.
+If that is the case, the remote update count for $e$ is updated and the value written by the local counterpart, the value in {\tt WrVal[$e$][$c$][$t$]}, is written into location $\alimemx e$.
+It ends with updating the update and statement execution counts done by $t'$.
+
+\paragraph{Fence macros.}
+A fence statement $s=\alifence$ by $t$ is simulated by $t$ executing $\aliatomicx{FenceL}$ and $t'$ executing $\aliatomicx{FenceR}$.
+Recall that $t$ can execute $\alifence$ only when its store buffer is empty, i.e. all the remote write actions corresponding to the local write actions by $t$ have occurred.
+In order to ensure this, local fence blocks until for every location $e$, the local update count is equal to the remote update count (note that the remote update count can never exceed the local update count). 
+The remote fence is simply set to be no-op, i.e. \aliskip.
+
+It might seem counter-intuitive to give the remote thread the capability of moving beyond a fence statement when the local has not executed yet, but as we shall see as far as the soundness of the transformation is concerned, only that the remote write actions are properly simulated (correct ordering with correct values) is enough.
+
+We set $T'$ be the set of {\em primed} thread identifiers derived from $T$, such that $t'\in T'$ iff $t\in T$.
+For notational convenience, we let $(t')'=t$.
+In order to avoid inessential technicality, we modify the operational semantics.
+We update the rule {\sc\small Init} to account for the local-remote pairing threads.
+\begin{mathpar}
+\inferrule*
+{Rl=\textnormal{\sc\small Init'} \\ M_i\in P \\ M_i= n(a)\ \{C\} \\ \alicontrolx t =\varepsilon}
+{\alivaluation[(t,\alireg_{in})\mapsto a] \\ \alicontrol[t\mapsto \alifirstx {\tau_l(C)}, t'\mapsto \alifirstx {\tau_r(C)}]}
+\end{mathpar}  
+We change the definition of {\alienabledx t} as follows:
+\[
+\alienabledx t \stackrel{def}{=} (\aliatomiclock=-1) \ \vee\ (\aliatomiclock=t)\ \vee\ (\aliatomiclock=t')
+\]
+Finally, we introduce a new keyword {\tt tido} such that for any valuation $\alivaluation$ and thread $t$, we have $\alivaluation\alievalx {\mathtt{tido}} t=t'$.
+
+\newcommand{\locseqequiv}{\ensuremath{\sim_l}}
+
+\subsection{Soundness of Transformation}
+\label{subsec:soundness}
+In this subsection, we prove that the program transformation defined above is sound.
+That is, $P$ running under TSO semantics is equivalent to $\alisplitprogx P$ running under SC semantics.
+To that end, we construct a bijection between the TSO-compliant runs of $P$ and the $\locseqequiv$-quotient of SC-compliant runs of $\alisplitprogx P$.
+We begin by defining the equivalence relation $\locseqequiv$, pick a representative from each $\locseqequiv$ class, and establish the bijective relation.
+
+Let us begin with an important observation about the orderings of local and remote transitions.
+\begin{lemma}\label{lem:transformation-bijection}
+Let $P$ be a program and $\alisplitprogx P$ be its transformation.
+Then, in any SC-compliant run of $\alisplitprogx P$, there is a bijection $\mu$ between all local and remote transitions such that the assignments to registers are identical.
+Furthermore, if $x_l$ is a local read or write transition and $x_r=\mu(x_l)$ then $x_l$ occurs before $x_r$.
+\end{lemma}
+\begin{proof}[Proof (Sketch)]
+Observe that the only time the two threads can diverge is when they read from memory, i.e. a {\sc\small Rd} transition.
+But in that case, the value read by the local thread is registered and the remote read gets that value.
+The second part follows from the use of {\aliassume} statements in the remote actions and the bijection can be established by matching each local transition with a remote transition such that they both observe the same (unique) value for {\tt st}.
+\end{proof}
+
+Let $\alisequencex r$ and $\alisequencex {r'}$ be permutationally equivalent SC-compliant runs of $\alisplitprogx P$.
+They are {\em locally equivalent}, $\alisequencex {r}\locseqequiv \alisequencex {r'}$, if the projections of their traces to local actions (executed by unprimed thread identifiers) and remote write actions ({\sc\small Wr}-transitions executed by primed identifiers) are identical.
+Formally, $\alisequencex r\locseqequiv \alisequencex {r'}$ iff 
+\[
+\alitracex {\alisequencex r}\downarrow_{\{-,T:-\}\cup\{{\sc\small Wr},T':-\}} = \alitracex {\alisequencex {r'}}\downarrow_{\{-,T:-\}\cup\{{\sc\small Wr},T':-\}}
+\]
+where $\downarrow_{\{R,A:S\}}$ is the projection operator which removes all transitions $r,t:s$ such that $r\notin R$ or $t\notin T$ or $s\notin S$ and $-$ stands for empty set.
+
+The run $\alisequencex {r}$ is called {\em canonical} if for all $i<|\alisequencex {r}|$, $t\in T$ with $\alitracex {\alisequencex {r}}[i]=R,t:\aliloctransx s$, the following conditions are satisfied:
+\begin{itemize}
+\item if $R\notin \{\textnormal{\sc\small Wr,Fnc}\}$, then $\alitracex {\alisequencex {r}}[i+1]=R,t':\aliremtransx s$.
+\item if $R=\textnormal{\sc\small Fnc}$, then $\alitracex {\alisequencex {r}}[i+1]=\textnormal{\sc\small Skp},t':\aliremtransx s$.
+\end{itemize}
+Informally, a run is canonical if all local actions (transitions executed by unprimed threads) are immediately followed by their matching remote actions, except for write actions.
+
+\begin{lemma}\label{lem:canonical}
+Let $\alisequencex {r}$ be a TSO-compliant run of $P$.
+Then there exists a unique canonical run in $[\alisequencex {r}]_{\locseqequiv}$.
+\end{lemma}
+\begin{proof}[Proof (Sketch)]
+A remote transition (transitions of the form $R,t':\aliremtransx s$) either is completely defined by its matching local transition (when $R=\textnormal{\sc\small Rd}$) or by its local state (when $R\notin\{\textnormal{\sc\small Wr},\textnormal{\sc\small Rd}\}$).
+This means that all memory independent transitions $R,t':\aliremtransx s$ are both-movers relative to all transitions but those done by $t'$.
+All read transitions $\textnormal{\sc\small Rd},t':\aliremtransx s$ are left-movers and by construction cannot come before their matching local actions.
+This implies that all transitions can be rearranged to obtain a canonical run within the same equivalence class.
+Uniqueness comes from the fact that within the equivalence class the relative ordering among local actions and remote writes is preserved which means that in the canonical sequence each remote action has a well-defined position.
+\end{proof}
+We conclude by stating the main result of this section.
+
+\begin{theorem}\label{thm:soundness}[Soundness of Transformation]
+Let $P$ be a program.
+There exists a bijection between all SC-compliant canonical runs of $\alisplitprogx P$ and all TSO-compliant runs of $P$.
+\end{theorem}
+\begin{proof}[Proof (Sketch)]
+Let $\alisequencex r$ be a TSO-compliant run of $P$.
+We construct an SC-compliant run $\alisequencex {r'}$ of $\alisplitprogx P$.
+Every {\sc\small Init} transition of $\alisequencex r$ is replaced with an {\sc\small Init'} transition.
+Every $R,t:s$ with $R\in \{\textnormal{\sc\small RdM},\textnormal{\sc\small RdB}\}$ is replaced with $\textnormal{Rd},t:\aliloctransx s$ followed by $\textnormal{Rd},t:\aliremtransx s$.
+Every $\textnormal{\sc\small WrB},t:s$ is replaced with $\textnormal{\sc\small Wr},t:\aliloctransx s$.
+Every $\textnormal{\sc\small WrM},t:s$ is replaced with $\textnormal{\sc\small Wr},t':\aliremtransx s$.
+Finally, all other transitions $R,t:s$ are replaced with $R,t:\aliloctransx s$ followed by $R,t':\aliremtransx s$.
+That such a run exists follows from Lemma~\ref{lem:transformation-bijection}.
+For the other direction, we apply the same replacement rules in inverse form to obtain a TSO-compliant run of $P$ from an arbitrary SC-compliant canonical run of $\alisplitprogx P$.
+\end{proof}
+\begin{corollary}
+Let $P$ be a program.
+There exists a surjection from the SC-compliant runs of $\alisplitprogx P$ to the TSO-compliant runs of $P$.
+\end{corollary}
+\begin{proof}
+By Lem.~\ref{lem:canonical} any SC-compliant run has an $\locseqequiv$ canonical run which can then be transformed into a TSO-compliant run using the construction of the previous proof in opposite direction.
+\end{proof}
+
+
+
+
+
+\subsection{Example - Double Checked Initialization}
+\label{subsec:example-double-check}
 
 \begin{figure}[ht]
-\begin{alltt}DoubleCheckInit() 
+\begin{alltt}DoubleCheckInit(Obj) 
 \{
  r:=\(\alimem\)[Obj];
  \(\aliif\) r=0 \(\alithen\) 
@@ -415,9 +797,6 @@ We show how abstracting the program leads to a program which is SC-like.
 \label{fig:double-check}
 \end{figure}
 
-
-\subsection{Example - Double Checked Initialization}
-\label{subsec:example-double-check}
 Consider the code given in Fig.~\ref{fig:double-check}, which is derived from double checked initialization.
 The objective of the procedure is to ensure that a shared object $Obj$ is initialized exactly once.
 In order to simplify presentation, we assume that $Obj$ fits in a single memory slot, addressed by {\alimemx {\tt Obj}}.
@@ -434,6 +813,118 @@ This is necessary to ensure that no other (concurrent thread) has initialized $O
 If $Obj$ is initialized by some other thread, the lock is released by resetting {\alimemx{l}} back to 0 and the procedure terminates.
 Otherwise, a new memory slot is prepared and $Obj$ is assigned to this new slot, which is followed by the release of the lock and the termination of the procedure.
 
+I think {\tt xcolor} messes things up.
+
+
+
+
+{\sc \color{red} Ali stopped here.}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%% Ali stopped here  %%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+
+\section{Discussion}
+
+\paragraph{Mover Analysis in SC.}
+\paragraph{Other Relaxed Memory Models.}
+
+\section{Conclusion}
+
+
+\appendix
+\section{Appendix Title}
+
+This is the text of the appendix, if you need one.
+
+\acks
+
+Acknowledgments, if needed.
+
+% We recommend abbrvnat bibliography style.
+
+\bibliographystyle{abbrvnat}
+
+% The bibliography should be embedded for final submission.
+
+\begin{thebibliography}{}
+\softraggedright
+
+\bibitem[Smith et~al.(2009)Smith, Jones]{smith02}
+P. Q. Smith, and X. Y. Jones. ...reference text...
+
+\end{thebibliography}
+
+\end{document}
+
+
+
+
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%% Comments after this point %%%%%%%%%%%%
+%%%%%%%%%%%%%%% Comments after this point %%%%%%%%%%%%
+%%%%%%%%%%%%%%% Comments after this point %%%%%%%%%%%%
+%%%%%%%%%%%%%%% Comments after this point %%%%%%%%%%%%
+%%%%%%%%%%%%%%% Comments after this point %%%%%%%%%%%%
+%%%%%%%%%%%%%%% Comments after this point %%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+
+
+
+
+
+
+
+
+\COMMENT{
 \paragraph{Triangular race.}
 This code has a triangular race due to the first read of $Obj$, but before getting into that let us first discuss why the read of $Obj$ within the lock protected region does not lead to a triangular race.
 Let us use $R_1$ and $R_2$ to denote the first and second read statements of $\alimemx {\tt Obj}$. 
@@ -455,15 +946,9 @@ Let the TSO-run $\alisequencex r$ be in the form
 \alisequencex r = q_0\tau_1\cdot\ q\xrightarrow{\textnormal{\sc\small Wr},t:W_l}\cdot\ \tau_2\ \cdot q'\xrightarrow{}
 \]
 
+}
 
-
-%%%%%%%%%%%%%%%%%%%%%
-%%%%%%%stopped here
-%%%%%%%%%%%%%%%%%%%%%
-
-
-
-%%%%%%%%%%%%%
+%%%%%%%%%%%%
 %%%the following should go into the QED section where we describe how SC based analysis tools 
 %%%can be used to decide the mover types of remote or local write actions.
 %%%%%%%%%%%%%
@@ -587,40 +1072,6 @@ The replacement of the initialization of
 
 %We now present a mapping which will output another program $P'$ such that there exists a bijection between $\alirunsx {tso} P$ and $\alirunsx {sc} P$. 
 
-\section{Speaking Locally - QED and TSO}
-
-\section{Reduction for Other Relaxed Memory Models}
-
-\section{Conclusion}
-
-
-\appendix
-\section{Appendix Title}
-
-This is the text of the appendix, if you need one.
-
-\acks
-
-Acknowledgments, if needed.
-
-% We recommend abbrvnat bibliography style.
-
-\bibliographystyle{abbrvnat}
-
-% The bibliography should be embedded for final submission.
-
-\begin{thebibliography}{}
-\softraggedright
-
-\bibitem[Smith et~al.(2009)Smith, Jones]{smith02}
-P. Q. Smith, and X. Y. Jones. ...reference text...
-
-\end{thebibliography}
-
-
-\end{document}
-
-
 
 
 \COMMENT{
@@ -668,4 +1119,44 @@ It is possible to weaken the condition further as follows.
 \end{corollary}
 
 
+}
+
+
+
+\COMMENT{
+Consider the code given in Fig.~\ref{fig:store-buffer}, which is derived from a classic example illustrating the main behavioral difference between TSO and SC architectures.
+\begin{figure}[h]
+\begin{tabular}{p{.14\textwidth}p{.14\textwidth}p{.14\textwidth}}
+\begin{alltt}m1()
+\{
+ \(A\):=1;
+ \(\alireg\)[1]:=\(B\);
+\}\end{alltt} 
+&
+\begin{alltt}m2()
+\{
+ \(B\):=2;
+\}\end{alltt}
+&
+\begin{alltt}m3()
+\{
+ \(\alireg\)[1]:=\(B\);
+ \(\alireg\)[2]:=\(A\);
+\}\end{alltt}\\
+\multicolumn{3}{l}%
+{$\locwritex t A 1 \cdot \alireadx t B 0 \cdot \locwritex u B 2 \cdot \remwritex u B 2$}\\
+\multicolumn{3}{c}%
+{$ \cdot\ \alireadx v B 2 \cdot \alireadx v A 0 \cdot \remwritex t A 1$}
+\end{tabular}
+\caption{Store buffering with non SC-like memory trace.}
+\label{fig:store-buffer}
+\end{figure}
+The memory trace given in Fig.~\ref{fig:buffer-store} is TSO compliant.
+It belongs to a run in which thread $t$ runs {\tt m1}, $u$ runs {\tt m2} and $v$ runs {\tt m3} exactly once.
+
+
+
+
+In the remainder of this section, we work through an example program which contains a triangular race and hence is not initially amenable to an SC analysis.
+We show how abstracting the program leads to a program which is SC-like.
 }
