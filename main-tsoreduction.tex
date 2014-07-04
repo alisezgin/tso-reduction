@@ -273,70 +273,7 @@ Our contributions are:
 \newcommand{\aliremtransx}[1]{\ensuremath{\aliremtrans(#1)}}
 \newcommand{\aliequivgeneric}{\ensuremath{\simeq}}
 
-\section{Reduction for TSO}
-\label{sec:reduction-for-tso}
-In this section, we explain how the reduction theory of Lipton can be used for TSO.
-Our goal is to present sufficient conditions for programs such that when a program satisfies these conditions the program is guaranteed to be unable to distinguish TSO semantics from SC semantics. 
-This is the first step of applying reduction to TSO programs.
-In the following sections, we will show how we can extend the applicability of the same approach for programs which are initially TSO distinguishing.
-
-\begin{definition}[Movers]
-\label{def:movers}
-Let $P$ be a labelled program and let $\aliequivgeneric$ be an equivalence relation over $\alirunsx {tso} P$.
-Let $s$ be a statement that occurs in some method's body $m$ of $P$.
-Then, $s$ is {\em left-mover in $\aliequivgeneric$} if for any $\alisequencex r=\alisequencex r[1]\ldots\alisequencex r[k]\in\alirunsx {tso} P$ we have $\alisequencex r[i]\alisequencex r[i+1]=(R',t':s')(R,t:s)$ such that $\alimemtracex {s'} \alipotsox {\alimemtracex {\alisequencex r}} \alimemtracex s$ does not hold, then there exists a run $\alisequencex {r'}$ in $[\alisequencex r]_{\aliequivgeneric}$ such that $\alisequencex {r'}\langle 1,i\rangle=\alisequencex r\langle 1,i-1\rangle \alisequencex r[i+1]$.
-
-Similarly, $s$ is {\em right-mover in $\aliequivgeneric$} if for any $\alisequencex r=\alisequencex r[1]\ldots\alisequencex r[k]\in\alirunsx {tso} P$ we have $\alisequencex r[i-1]\alisequencex r[i]=(R,t:s)(R',t':s')$ such that $\alimemtracex {s} \alipotsox {\alimemtracex {\alisequencex r}} \alimemtracex {s'}$ does not hold, then there exists a run $\alisequencex {r'}$ in $[\alisequencex r]_{\aliequivgeneric}$ such that $\alisequencex {r'}\langle 1,i\rangle=\alisequencex r\langle 1,i-2\rangle \alisequencex r[i]\alisequencex r[i-1]$.
-\end{definition}
-
-Intuitively, $s$ is left mover (resp. right mover) if reordering $s$ before (resp. after) any other statement that is concurrent with $s$ does not change the behavior (all runs belonging to the same equivalence have the same behavior).
-In the classic definition of reduction, the equivalence relation requires that the two sequences be permutations of each other and that the end states are identical, which corresponds to $\tsoequivstrict$ in the TSO context.
-The reason for the added generality will become clear once we generalize reduction with abstraction.
-
-Our first result about movers follows immediately from definitions.
-\begin{lemma}
-Let $P$ be a labelled program.
-All of its TSO runs are SC-like if all remote writes are left-movers in $\tsoequivstrict$.
-Dually, all of its TSO runs are SC-like if all local actions (excluding remote writes) are right-movers in $\tsoequivstrict$.
-
-All of its TSO runs are observationally SC-like if all remote writes are left-movers in $\tsoequiv$.
-Dually, all of its TSO runs are observationally SC-like if all local actions (excluding remote writes) are right-movers in $\tsoequiv$.
-\end{lemma}
-This result depends on a strong constraint which is unlikely to be satisfied by many programs.
-In what follows we will provide a series of incrementally more general results.
-Fix a labelled program $P=\{m_1,\ldots,m_n\}$.
-\begin{lemma}
-All TSO runs of $P$ are SC-like if for each method $m_i$, either all of its local actions are right-movers in $\tsoequivstrict$ or all of its remote write actions are left-movers. 
-\end{lemma}
-This result helps us to reason about methods individually.
-We have the following corollary, which is also implied by triangular-race freedom of \cite{Owe2009}.
-\begin{corollary}
-Let $P$ be such that each $m_i$ either only updates the shared memory (no read actions) or only reads shared memory (no write actions).
-Then all of its TSO runs are SC-like.
-\end{corollary}
-
-Now we will investigate the impact of placing fence statements in restricting the non-SC-like behaviors of programs.
-For the following fix $s^{loc}$ and $s$ as matching local and remote write actions.
-\begin{lemma}
-If in any TSO run in which $s^{loc}$ is executed by some thread $t$, all the combined write actions executed by $t$ up to the occurrence of $s^{loc}$ are atomic and $s$ is left-mover, then $s^{loc}$ and $s$ are atomic.
-\end{lemma}
-This naturally leads to the following special instance which gives an insight about how fence statements lead to SC-like programs.
-\begin{corollary}
-If in any TSO run in which $s^{loc}$ is executed by thread $t$, there exists a fence action executed by $t$ preceding $s^{loc}$, no other local write actions by $t$ occur between the two actions and $s$ is left-mover, then $s^{loc}$ and $s$ are atomic.
-\end{corollary}
-This means that, unlike the general case, in order to argue that a write immediately following a fence statement is atomic, we only need to prove that its matching remote write action is left-mover. 
-There is a dual of this result which we state next.
-\begin{lemma}
-If in any TSO run in which $s^{loc}$ is executed by thread $t$, there does not exist any read action executed by $t$ until the occurrence of $s$, then $s^{loc}$ is right-mover and $s^{loc}$ and $s$ are atomic.
-\end{lemma}
-The next result which is a special case of the previous result explains why the use of fence statements restricts the runs of a TSO program to SC-like behaviors.
-\begin{corollary}
-Let $s;C;\alifence$ be a code block in some $m_i$ such that $C$ does not contain any read of shared memory (no statements of the form $r:=\alimemx e$).
-Then $s$ and all the writes in $C$ are atomic.
-\end{corollary}
-
-
-{\sc Code snippets demonstrating the results.}
+\input{reduction-for-tso}
 
 \newcommand{\aliabsrulex}[1]{\textnormal{\sc\small #1}}
 \newcommand{\alihavocval}{\ensuremath{\star}}
