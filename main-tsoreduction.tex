@@ -752,10 +752,50 @@ Otherwise, a new memory slot is prepared and $Obj$ is assigned to this new slot,
 
 I think {\tt xcolor} messes things up.
 
+\section{Discussion}
+It is not fair to claim that the work presented in this paper exists in a vacuum disconnected with what exists and has no openings to new related domains.
+We end the paper by arguing to the contrary on both accounts.
+
+\paragraph{Mover Analysis in SC.}
+This is perhaps not surprising: There is an intimate connection between atomicity proofs for programs under SC semantics and the write atomicity proofs we present here.
+We should first identify the subtle difference between the two usages of {\em atomicity}, which regrettably has acquired an ambiguous status.
+A program is atomic if every interleaving execution of its methods is equivalent to a sequential execution in which methods execute in isolation. 
+This definition of atomicity can be applied to code blocks, which is what reduction theory is essentially used for under SC semantics.
+It is typical practice to prove that a particular write or read is a mover to increase the size of an atomic block, thereby decreasing the number of possible interleavings.
+
+One natural question to ask is whether we can do what is being done for SC atomicity proofs to show that a program $P$ is TRF, without even using the split transformation.
+That is, can we use the mover type of a write statement in $P$ under SC semantics to deduce that it is atomic under TSO semantics?
+The answer to this question is in general negative.
+Consider the occurrences of the local and remote write actions of a write statement $s$ under TSO semantics:
+\[
+\alpha\ \cdot\ \locwritex t x v\ \cdot\ \gamma\ \cdot\ \remwritex t x v\ \cdot\ \beta
+\]
+The way the tool {\sc qed} determines the mover type of an action is to check whether that action moves to the left (right) of every other concurrent action.
+The use of assertions aims at capturing refining the set of potential concurrent actions, i.e. an over-approximation of the actions that might occur in $\gamma$.
+This leads us to a couple of {\em backward compatibility} results, i.e. porting mover types under SC to TSO.
+\begin{lemma}
+Let $P$ be a TSO program and $s$ be a statement in it.
+Assume that $s$ is proved to be left-mover in {\sc qed} under SC semantics (uses the same $P$ replacing all {\alifence} statements with {\aliskip}). 
+\begin{itemize}
+\item If $s$ is a simple write statement, $s$ is atomic under TSO semantics.
+\item if $s$ is of the form $\aliatomicx {\aliassertx {\varphi}; w}$, $\varphi$ is a predicate which can be falsified by write statements none of which is ever buffered, then $w$ is atomic under TSO semantics.
+\end{itemize}
+\end{lemma}
+\begin{proof}[Proof (Sketch)]
+If $s$ is a simple write statement, then it cannot move to the left of another action by introducing a failure.
+This implies that it does not conflict with any other statement in the program.
+The additional statements in TSO semantics do not introduce additional conflicts (a write under SC and its remote action under TSO have the same interference relative to concurrent actions).
+
+In the second case, the assertion helps the checker to narrow down the set of concurrent actions as explained above.
+Since the remote write 
+\end{proof}
+
+\paragraph{Other Relaxed Memory Models.}
+What makes a memory model relaxed is
 
 
 
-{\sc \color{red} Ali stopped here.}
+{\sc Ali stopped here.}
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -770,11 +810,6 @@ I think {\tt xcolor} messes things up.
 
 
 
-
-\section{Discussion}
-
-\paragraph{Mover Analysis in SC.}
-\paragraph{Other Relaxed Memory Models.}
 
 \section{Conclusion}
 
