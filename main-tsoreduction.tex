@@ -109,6 +109,8 @@ program verification
 \keywords
 reduction, total-store ordering, sequential consistency, race freedom, safety checking 
 
+\input{ali-commands}
+
 \section{Introduction}
 \label{sec:intro}
 Both TSO and SC give the allusion that the thread-local program order is respected for memory accesses.
@@ -126,32 +128,6 @@ Typically, one converts a TSO program into an equivalent one which has an additi
 Methodologies consequently differ on how they simplify the reasoning. 
 It could involve reducing the points where asynchronous updates can happen~\cite{AK20XX} or bounding the size of the buffer~\cite{BYZ20XX}.
 So far no work has tried to cross the gap between these two classes of programs in a uniform manner.
-
-\newcommand{\dontcare}{\ensuremath{\star}}
-\newcommand{\genmemaccess}{\ensuremath{\mathsf{M}}}
-\newcommand{\genmemaccesstso}{\ensuremath{\genmemaccess_{TSO}}}
-\newcommand{\genread}{\ensuremath{\mathsf{R}}}
-%\newcommand{\genreadtso}{\ensuremath{\genread_{TSO}}}
-\newcommand{\aliwrite}{\ensuremath{\mathsf{W}}}
-\newcommand{\aliwritex}[3]{\ensuremath{\aliwrite_{#1}(#2/#3)}}
-\newcommand{\aliread}{\ensuremath{\mathsf{R}}}
-\newcommand{\alireadx}[3]{\ensuremath{\aliread_{#1}(#2/#3)}}
-%\newcommand{\locwrite}{\ensuremath{\aliwrite^{\mathscr{L}}}}
-\newcommand{\locwrite}{\ensuremath{\aliwrite^{\mathsf{l}}}}
-\newcommand{\locwritex}[3]{\ensuremath{\locwrite_{#1}(#2/#3)}}
-%\newcommand{\remwrite}{\ensuremath{\aliwrite^{\mathscr{R}}}}
-\newcommand{\remwrite}{\ensuremath{\aliwrite^{\mathsf{r}}}}
-\newcommand{\remwritex}[3]{\ensuremath{\remwrite_{#1}(#2/#3)}}
-\newcommand{\alibarrier}{\ensuremath{\mathsf{B}}}
-\newcommand{\alibarrierx}[1]{\ensuremath{\alibarrier_{#1}}}
-\newcommand{\alilock}{\ensuremath{\mathsf{L}}}
-\newcommand{\alilockx}[1]{\ensuremath{\alilock_{#1}}}
-\newcommand{\aliunlock}{\ensuremath{\mathsf{U}}}
-\newcommand{\aliunlockx}[1]{\ensuremath{\aliunlock_{#1}}}
-
-
-\newcommand{\alitrue}{\ensuremath{\mathit{true}}}
-\newcommand{\alifalse}{\ensuremath{\mathit{false}}}
 
 
 
@@ -243,16 +219,6 @@ Our contributions are:
 \item Local and modular reduction framework for transformed programs.
 \end{itemize}
 
-\newcommand{\tsoalph}{\ensuremath{\Sigma}}
-\newcommand{\aliprojx}[2]{\ensuremath{#1\downarrow_{#2}}}
-\newcommand{\aliperm}{\ensuremath{\sim_{\pi}}}
-\newcommand{\alipotso}{\ensuremath{<^{tso}}}
-\newcommand{\alipotsox}[1]{\ensuremath{\alipotso_{#1}}}
-\newcommand{\aliposc}{\ensuremath{<^{sc}}}
-\newcommand{\aliposcx}[1]{\ensuremath{\aliposc_{#1}}}
-\newcommand{\alimatch}{\ensuremath{\mu}}
-\newcommand{\alimatchx}[1]{\ensuremath{\alimatch(#1)}}
-
 \newtheorem{definition}{Definition}
 \newtheorem{proposition}{Proposition}
 \newtheorem{lemma}{Lemma}
@@ -263,15 +229,6 @@ Our contributions are:
 %\newenvironment{proof}{\bf{Proof.\,\,}\rm}{$\hspace*{\fill}\Box$\par}
 
 \input{formal-framework}
-
-\newcommand{\alisplit}{\ensuremath{\mathsf{Split}}}
-\newcommand{\alisplitx}[1]{\ensuremath{\alisplit(#1)}}
-\newcommand{\alisplitprogx}[1]{\ensuremath{#1^S}}
-\newcommand{\aliloctrans}{\ensuremath{\tau_{l}}}
-\newcommand{\aliloctransx}[1]{\ensuremath{\aliloctrans(#1)}}
-\newcommand{\aliremtrans}{\ensuremath{\tau_{r}}}
-\newcommand{\aliremtransx}[1]{\ensuremath{\aliremtrans(#1)}}
-\newcommand{\aliequivgeneric}{\ensuremath{\simeq}}
 
 \input{reduction-for-tso}
 

@@ -1,13 +1,18 @@
+% !TEX root = main-tsoreduction.tex
 \section{Formal Framework}
 \label{sec:formal-framework}
+In this section, we describe the notation used in the rest of the paper, formalize TSO and SC semantics, and present a simple programming language.
 
 \begin{figure}
 \begin{tabular}{lcll}
-action ($a$,$b$) & ::= & \locwritex t x v & (local write: insertion of the write\\
-& & & of value $v$ into location $x$ by thread $t$)\\
-& $|$ & \remwritex t x v & (remote write: shared memory update\\
-& & & of $x$ with $v$ by $t$)\\
+action ($a$,$b$) & ::= & \aliwritex t x v & (direct write: shared memory\\
+& & & update of location $x$\\ 
+& & & with value $v$ by thread $t$)\\
 & $|$ & \alireadx t x v & (a read of value $v$ from $x$ by $t$)\\
+& $|$ & \locwritex t x v & (local write: insertion of the\\
+& & & write of $v$ into $x$ by $t$)\\
+& $|$ & \remwritex t x v & (remote write: shared memory\\
+& & & update of $x$ with $v$ by $t$)\\
 & $|$ & \alibarrierx t & (memory barrier by $t$)
 %& $|$ & \alilockx t & (the beginning of a \\
 %& $|$ & \aliunlockx t
@@ -16,60 +21,73 @@ action ($a$,$b$) & ::= & \locwritex t x v & (local write: insertion of the write
 \label{fig:grammar-tso}
 \end{figure}
 \paragraph{Notation.} 
-The symbols we are going to use and their meanings are given in Fig.~\ref{fig:grammar-tso}.
+Let $\mathbf{a}$ be a sequence over $A$.
+We will use indexed notation to refer to the elements in $\mathbf{a}$: $\mathbf{a}[i]$ is the $i^{th}$ action in $\mathbf{a}$.
+Similarly, we let $\mathbf{a}\langle i,j\rangle$ denote the segment of $\mathbf{a}$ from $\mathbf{a}[i]$ to $\mathbf{a}[j]$ with both ends inclusive.
+The length of $\mathbf{a}$ is written as $\alilenx {\mathbf{a}}$ and gives the number of symbols in $\mathbf{a}$.
+Let $\pi$ be a permutation over $[1,\alilenx {\mathbf{a}}]$.
+We use $\pi(\mathbf{a})$ to denote the sequence $\mathbf{a}[\pi(1)]\ldots \mathbf{a}[\pi(\alilenx {\mathbf{a}})]$.
+Two sequences $\mathbf{a}$ and $\mathbf{b}$ are {\em permutationally equivalent}, written $\mathbf{a} \aliperm \mathbf{b}$, if there is a permutation $\pi$ such that $\mathbf{a}=\pi(\mathbf{b})$.
+
+As far as the memory accesses are concerned, the symbols we are going to use and their informal meanings are given in Fig.~\ref{fig:grammar-tso}.
 For simplicity, we omit locked operations which can be modeled by the given actions.
-A local write $\locwritex t x v$ {\em matches} the remote write $\remwritex u y w$ iff $t=u$, $x=y$ and $v=w$.
-We will use the notation $\tsoalph_{op,thr,loc}$ to denote the subset of $\tsoalph$ which contains all actions of type $op\in\{\locwrite, \remwrite, \aliread, \alibarrier\}$, by thread $thr$, and into location $loc$.
+We will use the notation $\tsoalph_{op,thr,loc}$ to denote the subset of $\tsoalph$ which contains all actions of type $O\subseteq\{\aliwrite, \aliread, \locwrite, \remwrite, \alibarrier\}$, by thread $thr$, and into location $loc$.
+When $O$ is a singleton, we will ignore the braces.
 Omitting parameters denotes existential quantification; e.g. $\tsoalph_{-,t,-}$ is the set of all actions done by thread $t$.
+The projection of a sequence $\mathbf{e}$ over $\tsoalph$ into $\tsoalph_{O,t,l}$, written as $\mathbf{e}\downarrow_{O,t,l}$, is the subsequence obtained by keeping only those actions in $\tsoalph_{O,t,l}$.
+For instance, $\aliprojx {\mathbf{e}} {\aliread,t,-}$ is the subsequence of $\mathbf{e}$ consisting of all the read actions done by $t$.
 
-
-Let $\mathbf{e}$ be a sequence over $\tsoalph$.
-We will use indexed notation to refer to the elements in $\mathbf{e}$: $\mathbf{e}[i]$ is the $i^{th}$ action in $\mathbf{e}$.
-Similarly, we let $\mathbf{e}\langle i,j\rangle$ denote the segment of $\mathbf{e}$ from $\mathbf{e}[i]$ to $\mathbf{e}[j]$ with both ends inclusive.
-The length of $\mathbf{e}$ is written as $|\mathbf{e}|$ and gives the number of actions in $\mathbf{e}$.
-Let $\pi$ be a permutation over $[1,k]$ and $\mathbf{e}$ be of length $k$.
-We use $\pi(\mathbf{e})$ to denote the sequence $\mathbf{e}[\pi(1)]\ldots \mathbf{e}[\pi(k)]$.
-Two executions $\mathbf{e}$ and $\mathbf{f}$ are {\em permutationally equivalent}, written $\mathbf{e} \aliperm \mathbf{f}$, if there is a permutation $\pi$ such that $\mathbf{e}=\pi(\mathbf{f})$.
-
-The projection of $\mathbf{e}$ into $\tsoalph_{o,t,l}$, written as $\mathbf{e}\downarrow_{o,t,l}$, is the subsequence obtained by keeping only those actions in $\tsoalph_{o,t,l}$.
-For instance, $\aliprojx {\mathbf{e}} {\locwrite,t,-}$ is the subsequence of $\mathbf{e}$ consisting of all the local writes done by $t$.
-
+\subsection{TSO and SC Executions}
+\label{subsec:tso-sc-semantics}
+In this section, we define correct TSO and SC executions, and define what we mean by an equivalent SC-execution to a given TSO-execution whenever the former exists.
 
 \paragraph{TSO-executions.}
-Let $\mathbf{e}$ be a sequence over $\tsoalph$.
-It is {\em matched} if for any $t$ there is an injection $\mu$ from $\aliprojx {\mathbf{e}} {\remwrite,t,-}$ to $\aliprojx {\mathbf{e}} {\locwrite,t,-}$ such that $\mu(a)=b$ implies that $b$ matches $a$.
+{\em TSO actions}, subset of $\tsoalph$, exclude only the first kind, $\aliwritex t x v$.
+A remote write $\remwritex t x v$ {\em matches} the local write $\locwritex u y w$ iff $t=u$, $x=y$ and $v=w$.
+Let $\mathbf{e}$ be a sequence of TSO actions.
+It is {\em matched} if for all $t$, $\aliprojx {\mathbf{e}} {\remwrite,t,-}[i]$ matches $\aliprojx {\mathbf{e}} {\locwrite,t,-}[i]$.
 A local write $\mathbf{e}[i]$ is {\em buffered at $j$} if it is matched by a remote write at position $l>j$.
 We will call a matched $\mathbf{e}$ {\em complete} if there are no buffered writes at $|\mathbf{e}|$.
+Unless stated otherwise, sequences of TSO actions are assumed to be complete.
 
-A TSO-execution is a matched sequence $\mathbf{e}$ over $\tsoalph$ subject to well-formedness constraints:
+A TSO-execution is a sequence $\mathbf{e}$ of TSO actions subject to well-formedness constraints:
 \begin{itemize}
-\item The order of remote writes per thread respects the order of their matching local writes.
-Formally, for $i<j$ such that $\mathbf{e}[i]=\locwritex t x v$ and $\mathbf{e}[j]=\locwritex t y w$ and there is $k$ with $\mu(\mathbf{e}[k])=\mathbf{e}[j]$, then there is $l$ such that $j<l<k$ and $\mu(\mathbf{e}[l])=\mathbf{e}[i]$.
+\item Local write actions occur before their matching remote write actions.
+Formally, if $\mathbf{e}[i]=\locwritex t x v$ and $\mathbf{e}[j]=\remwritex t x v$ are respectively the $k^{th}$ local and remote write actions by thread $t$, then $i<j$.
 \item The read values are consistent.
 Formally, if $\mathbf{e}[j]=\alireadx t x v$, then either i) $\locwritex t x v$ is the most recent buffered write at $j$ by $t$ to $x$, or ii) no buffered write to $x$ by $t$ at $j$ exists and $\remwritex u x v$ is the most recent remote write, or iii) neither condition applies and $v$ is the initial value.
 \item The barrier operations can only happen when the buffer is empty.
 Formally, if $\mathbf{e}[j]=\alibarrierx t$ and if $\locwritex u x v$ is buffered at $j$, then $t\neq u$.
 \end{itemize}
 
-
-
-\begin{definition}[Atomic]
-A local write $\mathbf{e}[i]$ is {\em atomic} if it is not buffered at $i+1$.
-A complete TSO-execution $\mathbf{e}$ is called {\em atomic} if all of its local writes are atomic.
+\begin{definition}[Synchronous, Buffer-free]
+A local write $\mathbf{e}[i]$ is {\em synchronous} if it is not buffered at $i+1$.
+A complete TSO-execution $\mathbf{e}$ is called {\em buffer-free} if all of its local writes are synchronous.
 \end{definition}
+Synchronous local writes form the crux of the reduction we present in this paper.
+The following observations state that a thread $t$ can perform a synchronous local write only when its buffer is empty.
+\begin{lemma}\label{lem:synchronous-write}
+Let the local write $\mathbf{e}[i]=\locwritex t x v$ of a TSO-execution $\mathbf{e}$ be synchronous.
+Then $\mathbf{e}\langle 1,i+1\rangle\cdot\ \alibarrierx t\cdot\ \mathbf{e}\langle i+2,\alilenx{\mathbf{e}}\rangle$ is also a (well-formed) TSO-execution.
+\end{lemma} 
+\begin{proof}
+This follows from the definition of well-formedness which requires local and remote writes of the same thread to be in the same order because that implies that no local write can be buffered by $t$ at $i$.
+\end{proof}
 
 Each TSO-execution $\mathbf{e}$ induces a partial order $\alipotsox {\mathbf{e}}$ over $\{\mathbf{e}[i] \mid i\in[1,|\mathbf{e}|]\}$ such that $a\alipotsox {\mathbf{e}} b$ if $a$ occurs before $b$ in $\mathbf{e}$, $a,b\in\tsoalph_{-,t,-}$ and one of the following holds:
 \begin{itemize}
-\item $a\in\tsoalph_{\remwrite,-,-}$ iff $b\in\tsoalph_{\remwrite,-,-}$.
-\item $b=\alimatchx a$.
+\item both $a$ and $b$ are remote write actions.
+\item neither $a$ nor $b$ is a remote write action. 
+\item $a$ is the $i^{th}$ local write by $t$ and $b$ is the $i^{th}$ remote write by $t$.
 \end{itemize}
 
 \paragraph{SC-executions.}
-An SC-execution $\mathbf{s}$ is a sequence over the alphabet $\{\aliwritex t x v\}\cup\{\alireadx t x v\}$.
-The actions of the form $\aliwritex t x v$, denoting the write of value $v$ into location $x$ by thread $t$, are called {\em write} actions.
-Each SC-execution has to satisfy: if $\mathbf{s}[i]=\alireadx t x v$, then either i) there is $j<i$ with $\mathbf{s}[j]=\aliwritex u x v$ and there are no write actions to $x$ in $\mathbf{s}\langle j+1,i\rangle$, or ii) there is no write action in $\mathbf{s}\langle 1,i\rangle$ and $v$ is $\bot$.
+{\em SC actions}, subset of $\tsoalph$, include only the first two kinds of actions; i.e., $\{\aliwritex t x v\}\cup\{\alireadx t x v\}$.
+%The actions of the form $\aliwritex t x v$ are (direct) {\em write} actions.
+SC-executions have to satisfy: if $\mathbf{s}[i]=\alireadx t x v$, then either i) there is $j<i$ with $\mathbf{s}[j]=\aliwritex u x v$ and there are no write actions to $x$ in $\mathbf{s}\langle j+1,i\rangle$, or ii) there is no write action in $\mathbf{s}\langle 1,i\rangle$ and $v$ is $\bot$.
 
-Similar to TSO-executions, each SC-execution $\mathbf{s}$ induces a partial order $\aliposcx {\mathbf{s}}$ such that $a\aliposcx {\mathbf{s}} b$ if $a$ occurs before $b$ in $\mathbf{s}$ and both belong to the same thread.
+
+%Similar to TSO-executions, each SC-execution $\mathbf{s}$ induces a partial order $\aliposcx {\mathbf{s}}$ such that $a\aliposcx {\mathbf{s}} b$ if $a$ occurs before $b$ in $\mathbf{s}$ and both belong to the same thread.
 
 \newcommand{\SCofTSO}{\ensuremath{\mathsf{SC}}}
 \newcommand{\SCofTSOx}[1]{\ensuremath{\SCofTSO(#1)}}
@@ -101,49 +119,54 @@ We define a mapping $\aliconvert$ from the actions of TSO to those of SC as foll
 For a TSO-execution $\mathbf{e}$, let $\aliconvertx {\mathbf{e}}$ denote the sequence obtained by the point-wise extension of $\aliconvert$.
 
 Let $\mathbf{e}$ be a complete TSO-execution.
-We define $\SCofTSOx {\mathbf{e}}$ to be the set of all SC-executions $\mathbf{s}$ such that $\aliconvertx {\aliprojx {\mathbf{e}} {-,t,-}}=\aliprojx {\mathbf{s}} {-,t,-}$.
-Informally, $\mathbf{s}$ belongs to $\SCofTSOx {\mathbf{e}}$ if it is an SC-execution and respects the thread local ordering of read and local write actions.
-
-A particular subset of $\SCofTSOx {\mathbf{e}}$ is of interest to us.
-Let $\SCofTSOstrictx {\mathbf{e}}\subseteq \SCofTSOx {\mathbf{e}}$ be the set of all $\mathbf{s}$ such that $\aliprojx {\mathbf{e}} {\remwrite,-,-} [i] = \remwritex t x v$ iff $\aliprojx {\mathbf{s}} {\aliwrite,-,-}[i] = \aliwritex t x v$.
-Informally, $\mathbf{s}$ will be in $\SCofTSOstrictx {\mathbf{e}}$ if additionally the order among the write actions in $\mathbf{s}$ preserves the order among the remote write actions in $\mathbf{e}$.
+We define $\SCofTSOx {\mathbf{e}}$ to be the set of all SC-executions $\mathbf{s}$ such that $\aliconvertx {\aliprojx {\mathbf{e}} {-,t,-}}=\aliprojx {\mathbf{s}} {-,t,-}$ and $\aliprojx {\mathbf{e}} {\remwrite,-,-}[i] = \remwritex t x v$ iff $\aliprojx {\mathbf{s}} {\aliwrite,-,-}[i] = \aliwritex t x v$.
+Informally, $\mathbf{s}$ belongs to $\SCofTSOx {\mathbf{e}}$ if it is an SC-execution, respects the thread local ordering of read and local write actions, and preserves the order among the remote write actions in $\mathbf{e}$.
 We have the following result following immediately from definitions.
 
+%We define $\SCofTSOx {\mathbf{e}}$ to be the set of all SC-executions $\mathbf{s}$ such that $\aliconvertx {\aliprojx {\mathbf{e}} {-,t,-}}=\aliprojx {\mathbf{s}} {-,t,-}$.
+%Informally, $\mathbf{s}$ belongs to $\SCofTSOx {\mathbf{e}}$ if it is an SC-execution and respects the thread local ordering of read and local write actions.
+
+%A particular subset of $\SCofTSOx {\mathbf{e}}$ is of interest to us.
+%Let $\SCofTSOstrictx {\mathbf{e}}\subseteq \SCofTSOx {\mathbf{e}}$ be the set of all $\mathbf{s}$ such that $\aliprojx {\mathbf{e}} {\remwrite,-,-} [i] = \remwritex t x v$ iff $\aliprojx {\mathbf{s}} {\aliwrite,-,-}[i] = \aliwritex t x v$.
+%Informally, $\mathbf{s}$ will be in $\SCofTSOstrictx {\mathbf{e}}$ if additionally the order among the write actions in $\mathbf{s}$ preserves the order among the remote write actions in $\mathbf{e}$.
+
 \begin{proposition}\label{prop:complete-tso}
-For any atomic TSO-execution $\mathbf{e}$, $\aliconvertx {\mathbf{e}} \in \SCofTSOstrictx {\mathbf{e}}$.
+For any buffer-free TSO-execution $\mathbf{e}$, $\aliconvertx {\mathbf{e}} \in \SCofTSOx {\mathbf{e}}$.
 \end{proposition}
-Proposition~\ref{prop:complete-tso} implies that an atomic TSO-execution can always be transormed into an SC-execution by simply replacing each (adjacent) pair of local and remote write actions by their image under $\aliconvert$.
+The proof follows from the fact that in a buffer-free TSO-execution, all reads are from the memory (only condition (ii) of TSO well-formedness for consistent read values applies).
+The desired SC-execution then can be obtained by simply replacing each (adjacent) pair of local and remote write actions by their image under $\aliconvert$.
+
 
 \paragraph{Equivalence ($\tsoequiv$) and partial order ($\tighter$) over TSO-executions.}
-Two complete TSO-executions $\mathbf{e}$ and $\mathbf{f}$ are {\em equivalent}, written $\mathbf{e}\tsoequiv\mathbf{f}$, if one can be obtained from the other by moving the actions such that the per thread order is preserved.
-Formally, $\mathbf{e}\tsoequiv\mathbf{f}$ if $\mathbf{e}\aliperm\mathbf{f}$ and $\aliprojx {\mathbf{e}} {-,t,-}=\aliprojx {\mathbf{f}} {-,t,-}$.
-They are {\em strictly} equivalent, written $\mathbf{e}\tsoequivstrict\mathbf{f}$, if the order among the remote writes is also preserved.
-Formally, $\mathbf{e}\tsoequivstrict\mathbf{f}$ if $\mathbf{e}\tsoequiv\mathbf{f}$ and $\aliprojx {\mathbf{e}} {\remwrite,-,-}=\aliprojx {\mathbf{f}} {\remwrite,-,-}$.
-Whenever no confusion is likely to arise, we will use $\pi$ to denote one of the permutations between two (strictly) equivalent TSO-executions establishing their (strict) equivalence.
+Two complete TSO-executions $\mathbf{e}$ and $\mathbf{f}$ are {\em equivalent}, written $\mathbf{e}\tsoequiv\mathbf{f}$, if they are permutationally equivalent and they both induce the same partial order. 
+Formally, $\mathbf{e}\tsoequiv\mathbf{f}$ if $\mathbf{e}\aliperm\mathbf{f}$ and $\alipotsox {\mathbf{e}}=\alipotsox {\mathbf{f}}$.
+Whenever no confusion is likely to arise, we will use $\pi$ to denote one of the permutations between two equivalent TSO-executions establishing their equivalence.
 
-Atomicity induces a partial order $\tighter$ on TSO-equivalent traces.
-A TSO-execution $\mathbf{e}$ is {\em tighter} than $\mathbf{f}$, written $\mathbf{e}\tighter\mathbf{f}$ if $\mathbf{e}\tsoequiv\mathbf{f}$ and whenever $\mathbf{f}[i]$ is an atomic local write, then so is $\mathbf{e}[\pi^{-1}(i)]$.
-In other words, $\mathbf{e}$ is tighter than an equivalent $\mathbf{f}$ if all the atomic writes of the latter are also atomic in the former. 
-The execution $\mathbf{e}$ is strictly tighter than $\mathbf{f}$, written $\mathbf{e}\tighterstrict\mathbf{f}$, if $\mathbf{e}$ is tighter than $\mathbf{f}$ and they are strictly equivalent.
-
-Each TSO-execution thus induces a set of (strictly) tighter executions.
+Synchronous writes induce a partial order $\tighter$ on equivalent TSO-execution.
+A TSO-execution $\mathbf{f}$ is {\em tighter} than $\mathbf{e}$, written $\mathbf{f}\tighter\mathbf{e}$ if $\mathbf{f}\tsoequiv\mathbf{e}$ and whenever $\mathbf{e}[i]$ is a synchronous local write, then so is $\mathbf{f}[\pi(i)]$.
+In other words, $\mathbf{f}$ is tighter than an equivalent $\mathbf{e}$ if all synchronous writes of the latter are also synchronous in the former. 
+%The execution $\mathbf{e}$ is strictly tighter than $\mathbf{f}$, written $\mathbf{e}\tighterstrict\mathbf{f}$, if $\mathbf{e}$ is tighter than $\mathbf{f}$ and they are strictly equivalent.
+Each TSO-execution thus induces a set of tighter executions.
 Let $\tightclosurex{\mathbf{e}}=\{\mathbf{f} \mid \mathbf{f}\tighter\mathbf{e}\}$; that is, the set of all TSO-executions tighter than $\mathbf{e}$.
-Let $\tightclosurestrictx {\mathbf{e}}$ denote the subset of $\tightclosurex{\mathbf{e}}$ consisting of only strictly equivalent executions.
+%Let $\tightclosurestrictx {\mathbf{e}}$ denote the subset of $\tightclosurex{\mathbf{e}}$ consisting of only strictly equivalent executions.
 
 \begin{definition}[SC-like]
 Let $\mathbf{e}$ be a TSO-execution.
-It is called {\em observationally SC-like} if $\tightclosurex {\mathbf{e}}$ contains an atomic execution.
-It is called {\em SC-like} if $\tightclosurestrictx {\mathbf{e}}$ contains an atomic execution.
+%It is called {\em observationally SC-like} if $\tightclosurex {\mathbf{e}}$ contains an atomic execution.
+It is called {\em SC-like} if $\tightclosurex {\mathbf{e}}$ contains a buffer-free execution.
+Otherwise, it is called {\em TSO-specific}.
 \end{definition}
-Since for any TSO-execution $\mathbf{e}$ we have $\tightclosurestrictx {\mathbf{e}}\subseteq \tightclosurex {\mathbf{e}}$, SC-like is a stronger property than observationally SC-like.
+%Since for any TSO-execution $\mathbf{e}$ we have $\tightclosurex {\mathbf{e}}\subseteq \tightclosurex {\mathbf{e}}$, SC-like is a stronger property than observationally SC-like.
 The terms are not arbitrarily named as the following proposition shows.
 
 \begin{proposition}
-Let $\mathbf{e}$ be a complete TSO-execution.
-It is observationally SC-like iff $\tightclosurex {\mathbf{e}} \cap \SCofTSOx {\mathbf{e}} \neq \emptyset$.
-It is SC-like iff $\tightclosurestrictx {\mathbf{e}} \cap \SCofTSOstrictx {\mathbf{e}} \neq \emptyset$.
+A TSO-execution $\mathbf{e}$ is SC-like iff $\tightclosurex {\mathbf{e}} \cap \SCofTSOx {\mathbf{e}} \neq \emptyset$.
+%It is SC-like iff $\tightclosurestrictx {\mathbf{e}} \cap \SCofTSOstrictx {\mathbf{e}} \neq \emptyset$.
 \end{proposition}
-
+Intuitively, permutationally equivalent TSO-executions have identical observations about the state of the memory; i.e. the values returned by the reads are identical.
+A tighter execution is one which has at most as many buffered local writes as those of the less tight one. 
+At the limit, all local writes are synchronous (no buffered writes), which makes the execution buffer-free.
+Thus, if an execution is equivalent to a buffer-free execution, then its behavior is identical to that of an SC-execution which is obtained by replacing all synchronous write actions with direct write actions.
 
 \newcommand{\independent}{\ensuremath{\nleftarrow}}
 \newcommand{\independentstrict}{\ensuremath{\independent_S}}
@@ -163,38 +186,56 @@ It is SC-like iff $\tightclosurestrictx {\mathbf{e}} \cap \SCofTSOstrictx {\math
 \newcommand{\shuffleset}{\ensuremath{\mathsf{Shuff}}}
 \newcommand{\shufflesetx}[1]{\ensuremath{\shuffleset(#1)}}
 
-\paragraph{Conflict Relations.}
-Two TSO actions $a$ and $b$ {\em conflict}, written $\aliconflict(a,b)$, if one of the following holds:
-\begin{description}
-\item[\rulerem] $a,b\in\tsoalph_{\remwrite,t,-}$.
-\item[\rulethr] $a,b\in\tsoalph_{\{\locwrite,\aliread,\alibarrier\},t,-}$.
-\item[\ruleloc] $a,b\in\tsoalph_{-,-,x}$ and $\{a,b\}\nsubseteq\tsoalph_{\aliread,-,-}$.
-\end{description}
-They {\em strictly} conflict, $\aliconflictstrict(a,b)$, if {\rulerem} is replaced with
-\begin{description}
-\item[\ruleremstrict] $a,b\in\tsoalph_{\remwrite,-,-}$.
-\end{description}
 
-Let $\mathbf{e}$ be a TSO-execution of length $k$.
-A sequence $\mathbf{f}$ is a {\em shuffling} of $\mathbf{e}$ if $\mathbf{e}\aliperm\mathbf{f}$ and there is some $i$ such that for all $j\notin\{i,i+1\}$, $\mathbf{e}[j]=\mathbf{f}[j]$ and $\mathbf{e}[i]=\mathbf{f}[i+1]$.
-The position $i$ is called the {\em pivot} (of shuffling).
-A shuffling of $\mathbf{e}$ with pivot $i$ is {\em valid} if $\pi(\mathbf{e})$ is a TSO-execution and $\mathbf{e}[i]$ does not conflict with $\mathbf{e}[i+1]$.
-Let $\shufflesetx {\mathbf{e}}$ denote the closure of the valid shufflings on $\mathbf{e}$.
-Formally, $\shufflesetx {\mathbf{e}}$ is defined as the set satisfying
-\begin{itemize}
-\item $\mathbf{e}\in\shufflesetx {\mathbf{e}}$,
-\item $\mathbf{f}\in\shufflesetx {\mathbf{e}}$ implies there is $\mathbf{g}\in\shufflesetx {\mathbf{e}}$ and $\mathbf{f}$ is a valid shuffling of $\mathbf{g}$.
-\end{itemize}
 
-Observe that there are two further constraints implicitly enforced by requiring a valid shuffling with pivot $i$. 
-First, if $\mathbf{e}[i+1]$ is a barrier action by thread $t$ and $\mathbf{e}[i]$ is a remote write action by the same thread, then they cannot be reordered as barrier cannot occur when there is a buffered write. 
-Second, if $\mathbf{e}[i]$ is a local write action by $t$ and $\mathbf{e}[i+1]$ is the matching remote write action, reordering them is not allowed since the resulting sequence will not be a TSO-execution.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%% The following will probably used in the related %%%%
+%%%% work, when comparing ours with Bouajjani's. %%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\COMMENT{
 
-The shuffling closure of $\mathbf{e}$ gives an operational under-approximation of TSO-execution equivalence $\tsoequiv$ as the following result indicates.
+%\paragraph{Conflict Relations.}
+%Two TSO actions $a$ and $b$ {\em conflict}, written $\aliconflict(a,b)$, if one of the following holds:
+%\begin{description}
+%\item[\rulerem] $a,b\in\tsoalph_{\remwrite,t,-}$.
+%\item[\rulethr] $a,b\in\tsoalph_{\{\locwrite,\aliread,\alibarrier\},t,-}$.
+%\item[\ruleloc] $a,b\in\tsoalph_{-,-,x}$ and $\{a,b\}\nsubseteq\tsoalph_{\aliread,-,-}$.
+%\end{description}
+%They {\em strictly} conflict, $\aliconflictstrict(a,b)$, if {\rulerem} is replaced with
+%\begin{description}
+%\item[\ruleremstrict] $a,b\in\tsoalph_{\remwrite,-,-}$.
+%\end{description}
+%
+%Let $\mathbf{e}$ be a TSO-execution of length $k$.
+%A sequence $\mathbf{f}$ is a {\em shuffling} of $\mathbf{e}$ if $\mathbf{e}\aliperm\mathbf{f}$ and there is some $i$ such that for all $j\notin\{i,i+1\}$, $\mathbf{e}[j]=\mathbf{f}[j]$ and $\mathbf{e}[i]=\mathbf{f}[i+1]$.
+%The position $i$ is called the {\em pivot} (of shuffling).
+%A shuffling of $\mathbf{e}$ with pivot $i$ is {\em valid} if $\pi(\mathbf{e})$ is a TSO-execution and $\mathbf{e}[i]$ does not conflict with $\mathbf{e}[i+1]$.
+%Let $\shufflesetx {\mathbf{e}}$ denote the closure of the valid shufflings on $\mathbf{e}$.
+%Formally, $\shufflesetx {\mathbf{e}}$ is defined as the set satisfying
+%\begin{itemize}
+%\item $\mathbf{e}\in\shufflesetx {\mathbf{e}}$,
+%\item $\mathbf{f}\in\shufflesetx {\mathbf{e}}$ implies there is $\mathbf{g}\in\shufflesetx {\mathbf{e}}$ and $\mathbf{f}$ is a valid shuffling of $\mathbf{g}$.
+%\end{itemize}
+%
+%Observe that there are two further constraints implicitly enforced by requiring a valid shuffling with pivot $i$. 
+%First, if $\mathbf{e}[i+1]$ is a barrier action by thread $t$ and $\mathbf{e}[i]$ is a remote write action by the same thread, then they cannot be reordered as barrier cannot occur when there is a buffered write. 
+%Second, if $\mathbf{e}[i]$ is a local write action by $t$ and $\mathbf{e}[i+1]$ is the matching remote write action, reordering them is not allowed since the resulting sequence will not be a TSO-execution.
+%
+%The shuffling closure of $\mathbf{e}$ gives an operational under-approximation of TSO-execution equivalence $\tsoequiv$ as the following result indicates.
+%
+%\begin{proposition}
+%For complete TSO-execution $\mathbf{e}$, $\shufflesetx {\mathbf{e}} \subseteq \equivclassx {\mathbf{e}} {\tsoequiv}$.
+%\end{proposition}
 
-\begin{proposition}
-For complete TSO-execution $\mathbf{e}$, $\shufflesetx {\mathbf{e}} \subseteq \equivclassx {\mathbf{e}} {\tsoequiv}$.
-\end{proposition}
+}
+
+
+
+
 
 
 \newcommand{\aliprog}{\ensuremath{\mathtt{prog}}}
@@ -223,225 +264,109 @@ For complete TSO-execution $\mathbf{e}$, $\shufflesetx {\mathbf{e}} \subseteq \e
 
 \begin{figure}
 \begin{tabular}{lcl}
-$P$ & ::= & $M,P \mid \varepsilon$\\
-$M$ ($m$,$m',\ldots$) & ::= & $T\ N(T)\ \{ C \}$\\
-$C$ ($c$,$c',\ldots$) & ::= & $S$ ; $C \mid \varepsilon$\\
+%$P$ & ::= & $M,P \mid \varepsilon$\\
+$M$ ($m$,$m',\ldots$) & ::= & $N()\ \{ C \}$\\
+$C$ ($c$,$c',\ldots$) & ::= & $S$ {\tt ;} $C \mid \varepsilon$\\
 $S$ ($s$,$s',\ldots$) & ::= & $R := \alimemx {E} \mid \alimemx {E} := R \mid$\\
 & &  $R := E \mid \alifence \mid$\\
 & & $\aliifelsex {E} {C} {C}\mid$\\ 
 & & $\aliwhilex E C\mid \aliatomicx {C}$\\
 & & $\aliassume\ E \mid \aliassert\ E \mid \aliskip$\\
-$T$ & ::= & $\langle Bool\rangle \mid \langle Int\rangle$\\
-$N$ & ::= & $\langle Name\rangle$\\
+$E$ ($e$,$e',\ldots$) & ::= & $R \mid I \mid N() \mid \alitid \mid$\\
+& & $E+E \mid E-E \mid \ldots$\\
+& & $E\wedge E \mid E\vee E \mid \neg E \mid \ldots $\\
+$R$ ($r$,$r',\ldots$) & ::= & $\aliregx I$\\
+$N$ & ::= & $\langle String\rangle$\\
+$I$ & ::= & $\langle Integer\rangle$
+%$T$ & ::= & $\langle Bool\rangle \mid \langle Int\rangle$\\
 %$L$ & ::= & $\langle Label\rangle$\\
-$R$ ($r$,$r',\ldots$) & ::= & $\aliregx i$ ($i\in\mathbb{N}$)\\
-$E$ ($e$,$e',\ldots$) & ::= & $R \mid i \mid N(T) \mid \alitid \mid E+E \mid E-E \mid \ldots$\\
-& & $E\wedge E \mid E\vee E \mid \neg E \mid \ldots $
 \end{tabular}
 \label{fig:program-grammar}
 \caption{A simple programming language.}
 \end{figure}
 
 \newcommand{\aliprogstmt}{\ensuremath{\mathsf{Stmt}}}
-\newcommand{\aliprogstmtx}[1]{\ensuremath{\aliprogstmt (#1)}}
+\newcommand{\aliprogstmtx}[1]{\ensuremath{\aliprogstmt(#1)}}
+\newcommand{\alilabel}{\ensuremath{\mathsf{Lab}}}
+\newcommand{\alilabelx}[1]{\ensuremath{\alilabel(#1)}}
 
 \subsection{Programming Language}
 \label{subsec:programming-language}
 In this subsection, we formalize the programming language we are going to use in the rest of the paper.
 
 \paragraph{Syntax.}
-We use a simple programming language, whose grammar is given in Fig.~\ref{fig:program-grammar}.
-The nonterminal $R$, ranged over by $r$, refers to {\em registers} and are used to model thread local address space.
-The nonterminal $E$, ranged over by $e$, refers to well-formed {\em expressions} that can be written using registers, mathematical and logical operators, and the return values of procedures.
+We use a simple programming language, whose grammar for method definitions is given in Fig.~\ref{fig:program-grammar}.
+A method $M$ consists of a {\em name} ($N$) and a {\em code} ($C$).
+A name is simply a string.
+A code is a, possibly empty, sequence of statements ($S$) sequentially composed ({\tt ;}).
+Statements can be used to read from memory ($r := \alimemx e$), update the contents of a memory location ($\alimemx e := e'$), empty the store buffer (\alifence), assign a value to a register ($r := e$).
+The model control flow, we have the usual branching ($\aliifelsex e {e_1} {e_2}$) and looping ($\aliwhilex e$) statements.
+Additionally, we will also use an explicit blocking statement ($\aliassume\ e$), which blocks as long as $e$ evaluates to $\alifalse$.
+Finally, the statement ($\aliassert\ e$) is used to claim that $e$ should hold whenever this statement can execute.
+The nonterminal $R$ refers to {\em registers} and are used to model thread local address space.
+The nonterminal $E$ refers to well-formed {\em expressions} that can be written using registers, mathematical and logical operators, and the return values of procedures.
 The shared data space is mapped by $\alimemx e$, where $e$ is an expression which evaluates to $\mathbb{N}$.
-A 
-Instructions can be used to read from memory ($r := \alimemx e$), update the contents of a memory location ($\alimemx e := e'$), empty the store buffer (\alifence), assign a value to a register ($r := e$).
-The model control flow, we have the usual branching ($\aliifelsex e {e_1} {e_2}$) and looping ($\aliwhilex e$) instructions.
-Additionally, we will also use an explicit blocking instruction ($\aliassume\ e$), which blocks as long as $e$ evaluates to $\alifalse$.
-Finally, the instruction ($\aliassert\ e$) is used to claim that $e$ should hold whenever this instruction can execute.
-Let $\aliprogstmtx P$ denote the set of statements used in program $P$.
+As a syntactic sugar, we will use words in italic font with first letters capitalized to denote a location in shared memory, e.g. $Obj$ will stand for some $\alimemx i$.
 
-\newcommand{\alilabel}{\ensuremath{\mathsf{Lab}}}
-\newcommand{\alilabelx}[1]{\ensuremath{\alilabel(#1)}}
-\newcommand{\alicontrol}{\ensuremath{\mathsf{Ctrl}}}
-\newcommand{\alicontrolx}[1]{\ensuremath{\alicontrol(#1)}}
-\newcommand{\alivaluation}{\ensuremath{\mathsf{Val}}}
-\newcommand{\alivaluationx}[1]{\ensuremath{\alivaluation(#1)}}
-\newcommand{\alisucc}{\ensuremath{\mathsf{Succ}}}
-\newcommand{\alisuccx}[1]{\ensuremath{\alisucc(#1)}}
-\newcommand{\aliprec}{\ensuremath{\mathsf{Prec}}}
-\newcommand{\aliprecx}[1]{\ensuremath{\aliprec(#1)}}
-\newcommand{\alifirst}{\ensuremath{\mathsf{Fst}}}
-\newcommand{\alifirstx}[1]{\ensuremath{\alifirst(#1)}}
-\newcommand{\alisequencex}[1]{\ensuremath{\vec{#1}}}
-\newcommand{\alieval}{\ensuremath{\llbracket \rrbracket}}
-\newcommand{\alievalx}[1]{\ensuremath{\llbracket #1 \rrbracket}}
-\newcommand{\alibuffer}{\ensuremath{\mathsf{Buf}}}
-\newcommand{\alibufferx}[1]{\ensuremath{\alibuffer(#1)}}
-\newcommand{\alireadbuffer}{\ensuremath{\mathsf{RdBuf}}}
-\newcommand{\alireadbufferx}[2]{\ensuremath{\alireadbuffer(#1,#2)}}
-\newcommand{\aliatomiclock}{\ensuremath{\mathsf{lck}}}
-\newcommand{\aliatomicexitlabel}{\ensuremath{l_{x}}}
-\newcommand{\alienabled}{\ensuremath{\mathsf{Enb}}}
-\newcommand{\alienabledx}[1]{\ensuremath{\alienabled(#1)}}
-\newcommand{\alilts}{\ensuremath{\mathnormal{LTS}}}
-\newcommand{\aliltsx}[1]{\ensuremath{\alilts(#1)}}
-\newcommand{\alitrace}{\ensuremath{\mathsf{Tr}}}
-\newcommand{\alitracex}[1]{\ensuremath{\alitrace(#1)}}
-\newcommand{\alimemtrace}{\ensuremath{\mathsf{Mem}}}
-\newcommand{\alimemtracex}[1]{\ensuremath{\alimemtrace(#1)}}
-\newcommand{\aliosrules}{\ensuremath{Rules}}
-
-\begin{figure*}[th]
-\begin{mathpar}
-\fbox{$(\alicontrol,\alivaluation,\alibuffer,\aliatomiclock)\xrightarrow{Rl,t:s}(\alicontrol',\alivaluation',\alibuffer',\aliatomiclock')$}\\
-
-\inferrule*
-{Rl=\textnormal{\sc\small Init} \\ M_i\in P \\ M_i= n(a)\ \{C\} \\ \alicontrolx t =\varepsilon}
-{\alivaluation[(t,\alireg_{in})\mapsto a] \\ \alicontrol[t\mapsto \alifirstx C]}
-
-\inferrule*
-{Rl=\textnormal{\sc\small Rd} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
-s=r:=\alimemx e \\ \alienabledx t}
-{\alivaluation[(t,r)\mapsto \alivaluationx {\alivaluation{\alievalx e}t}] \\ \alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'}]}
-
-\inferrule*
-{Rl=\textnormal{\sc\small RdM} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\ 
-s=r := \alimemx e \\ \alivaluation{\alievalx e}t \notin \alibufferx t \\ \alienabledx t}
-{\alivaluation[(t,r)\mapsto \alivaluationx {\alivaluation{\alievalx e}t}] \\ \alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'}]}
-
-\inferrule*
-{Rl=\textnormal{\sc\small RdB} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\ 
-s=r := \alimemx e \\ \alivaluation{\alievalx e}t \in \alibufferx t \\ \alienabledx t}
-{\alivaluation[(t,r)\mapsto \alireadbufferx t {\alivaluation{\alievalx e}t}] \\ \alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'}]}
-
-
-\inferrule*
-{Rl=\textnormal{\sc\small Wr} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
-s=\alimemx e := r \\ \alienabledx t}
-{\alivaluation[(t,r)\mapsto {\alivaluation \alievalx e}t] \\ \alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'}]}
-
-\inferrule*
-{Rl=\textnormal{\sc\small WrB} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\ 
-s=\alimemx e := r \\ \alibufferx t = \alisequencex {b} \\ \alienabledx t}
-{\alibuffer[t\mapsto \alisequencex b \cdot(\alivaluation{\alievalx e}t,\alivaluationx {t,r})] \\ \alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'}]}
-
-\inferrule*
-{Rl=\textnormal{\sc\small WrM} \\ \alibufferx t = (a,d)\cdot\alisequencex {b} \\ \alienabledx t}
-{\alibuffer[t\mapsto \alisequencex b] \\ \alivaluation[a\mapsto d]}
-
-\inferrule*
-{Rl=\textnormal{\sc\small WrR} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\ 
-s= r := e \\ \alienabledx t}
-{\alivaluation[(t,r)\mapsto \alivaluation{\alievalx e}t] \\ \alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'}]}
-
-\inferrule*
-{Rl=\textnormal{\sc\small Fnc} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
-s=\alifence \\ \alibufferx t = \varepsilon \\ \alienabledx t}
-{\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'}]}
-
-\inferrule*
-{Rl=\textnormal{\sc\small IfT} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
-s=\aliifelsex e {c_1} {c_2} \\ \alivaluation{\alievalx e}t=\alitrue \\ \alienabledx t}
-{\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'} \cdot \alifirstx {c_1}]}  
-
-\inferrule*
-{Rl=\textnormal{\sc\small IfE} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
-s=\aliifelsex e {c_1} {c_2} \\ \alivaluation{\alievalx e}t=\alifalse \\ \alienabledx t}
-{\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'} \cdot \alifirstx {c_2}]}  
-
-\inferrule*
-{Rl=\textnormal{\sc\small WhI} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
-s=\aliwhilex e {c} \\ \alivaluation{\alievalx e}t=\alitrue \\ \alienabledx t}
-{\alicontrol[t\mapsto \alisequencex l \cdot l' \cdot {\alifirstx {c}}]}
-
-\inferrule*
-{Rl=\textnormal{\sc\small WhE} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
-s=\aliwhilex e {c} \\ \alivaluation{\alievalx e}t=\alifalse \\ \alienabledx t}
-{\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx {l'}]}
-
-\inferrule*
-{Rl=\textnormal{\sc\small Skp} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\ s=\aliskip}
-{\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx {l'}]}
-
-\inferrule*
-{Rl=\textnormal{\sc\small AtB} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
-s=\aliatomicx c \\ \aliatomiclock = -1}
-{\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx {l'} \cdot \aliatomicexitlabel \cdot \alifirstx {c}] \\ \aliatomiclock = t}
-
-\inferrule*
-{Rl=\textnormal{\sc\small AtE} \\ \alicontrolx t = \alisequencex l \cdot \aliatomicexitlabel \\ \aliatomiclock=t}
-{\alicontrol[t\mapsto \alisequencex l] \\ \aliatomiclock = -1}
-
-\inferrule*
-{Rl=\textnormal{\sc\small AsT} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
-s=\aliassertx{e} \\ \alivaluation{\alievalx e}t=\alitrue \\ \alienabledx t}
-{\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx {l'}]}
-
-\inferrule*
-{Rl=\textnormal{\sc\small AsF} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
-s=\aliassertx{e} \\ \alivaluation{\alievalx e}t=\alifalse \\ \alienabledx t}
-{\aliatomiclock = -2}
-
-\inferrule*
-{Rl=\textnormal{\sc\small Asm} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
-s=\aliassumex{e} \\ \alivaluation{\alievalx e}t=\alitrue \\ \alienabledx t}
-{\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx {l'}]}
-\end{mathpar}
-\caption{Operational semantics for TSO and SC.}
-\label{fig:operational-semantics}
-\end{figure*}
-
-
-\newcommand{\aliltsstates}{\ensuremath{Q}}
-\newcommand{\aliltsstatesx}[1]{\ensuremath{\aliltsstates^{#1}}}
-\newcommand{\aliltstransitions}{\ensuremath{Tr}}
-\newcommand{\aliltstransitionsx}[1]{\ensuremath{\aliltstransitions^{#1}}}
-
+A {\em program} is identified with a set of methods.
+We assume that each statement of a program is uniquely identified, captured by a labelling function $\alilabel: \aliprogstmtx P \rightarrow L$, where $\aliprogstmtx P$ denotes the set of statements used in program $P$ and $L$ is the (universal) {\em label} set.
 
 \paragraph{Operational Semantics.}
-A {\em labelled program} is a pair $(P,\alilabel)$ consisting of a program $P$ and a {\em labelling function} $\alilabel:\aliprogstmtx P \mapsto L$ mapping each statement of $P$ to a unique {\em label} in the set of labels, $L$.
-When no confusion is likely to arise, we use $P$ to refer also to a labelled program in which case $\alilabel$ is implicit.
-We use a labelled transition system (LTS) to define the semantics of a labelled program under either TSO or SC.
-
-Two statements $s$, $s'$ in $P$ are {\em consecutive} if $s;s'$ appears in $P$.
+\input{operational-semantics}
+%A {\em labelled program} is a pair $(P,\alilabel)$ consisting of a program $P$ and a {\em labelling function} $\alilabel:\aliprogstmtx P \mapsto L$ mapping each statement of $P$ to a unique {\em label} in the set of labels, $L$.
+%When no confusion is likely to arise, we use $P$ to refer also to a labelled program in which case $\alilabel$ is implicit.
+Two statements $s$, $s'$ in $P$ are {\em consecutive} if $s\mathtt{;}s'$ appears in some method of $P$.
 In such a case, $s'$ is the {\em sequential successor} of $s$ and $s$ the {\em sequential predecessor} of $s'$, denoted as $s'=\alisuccx s$ and $s=\aliprecx {s'}$.
 If $s$ has no sequential successor, we let $\alisuccx s=\varepsilon$.
 A {\em code block} is any code ($C$) delimited by two matching braces.
 The unique first statement in a non-empty code block is referred to as $\alifirstx C$.
 Observe that if $s$ is the last statement in a code block, then $\alisuccx s=\varepsilon$.
 
-A {\em program state} of $P$ is a tuple $(\alicontrol,\alivaluation,\alibuffer,\aliatomiclock)$.
+For a given program $P$, we use a labelled transition system (LTS), denoted as $\aliltsx P=(Q,q_{init},Tr,\rightarrow)$, to define the semantics of a program under either TSO or SC.
+A {\em program state} $q\in Q$ of $P$ is a tuple $(\alicontrol,\alivaluation,\alibuffer,\aliexecmode)$.
 The {\em control flow} $\alicontrol:T \mapsto L^*$ maps each thread in the set of thread identifiers $T$ to some sequence over labels.
 Intuitively, $\alicontrol$ encodes the execution context for each thread in the program.
-If $\alicontrolx t=\alisequencex {l}$, then $\alisequencex {l} \langle 1,|\alisequencex {l}|-1\rangle$ keeps the nesting history and $\alisequencex {l}[|\alisequencex {l}|]$ is the label of the next statement to be executed by thread $t$.
-The {\em valuation} $\alivaluation:(\mathbb{N}\cup T\times R)\mapsto \mathbb{N}$ maps each memory location and register of each thread to its content, assumed to be a non-negative integer.
+If $\alicontrolx t=\alisequencex {l}$, then $\alisequencex {l} \langle 1,\alilenx{\alisequencex {l}}-1\rangle$ keeps the nesting history and $\alisequencex {l}[\alilenx{\alisequencex {l}}]$ is the label of the next statement to be executed by thread $t$.
+The {\em valuation} $\alivaluation:\mathbb{N}\cup (T\times R) \rightarrow \mathbb{N}$ maps each memory location and register of each thread to its content, assumed to be a non-negative integer.
 Intuitively, $\alivaluation$ holds the storage state: the contents of each register of each thread and the contents of the (single) global memory.
 The contents of a memory location $i$, $\alimemx i$, is accessed by $\alivaluationx {i}$, and the content of some register $r$ used by a thread $t$ is accessed by $\alivaluationx {t,r}$.
-The {\em buffer view} $\alibuffer:T \mapsto (\mathbb{N}\times\mathbb{N})^*$ maps each thread to a sequence over pairs of natural numbers.
+The {\em buffer view} $\alibuffer:T \rightarrow (\mathbb{N}\times\mathbb{N})^*$ maps each thread to a sequence over pairs of natural numbers.
 Intuitively, $\alibufferx t=(a_1,d_1)\ldots(a_k,d_k)$ means that the store buffer of thread $t$ contains $k$ buffered writes, the oldest being to location $a_1$ of value $d_1$ and the newest being to location $a_k$ of value $d_k$.
 We use $a\in\alibufferx t$ to denote the fact that there is $j\in[1,k]$ with $a_j=a$.
 In such a case, let $\alireadbufferx t a$ denote $d_j$ such that $a_j=a$ and for all $i>j$, $a_i\neq a$.
-Finally, the {\em lock state} $\aliatomiclock$ is a variable ranging over $\{-1,-2\}\cup T$.
-Intuitively, $\aliatomiclock$ is $-1$ if no thread is currently executing an atomic block, is $t$ if thread $t$ is executing an atomic block.
-When $\aliatomiclock$ is set to $-2$, it denotes an assertion violation on occurrence of which all threads are blocked.
-The transition relation of program $P$ is given in Fig.~\ref{fig:operational-semantics}.
+Finally, the {\em execution mode} $\aliexecmode$ is a variable ranging over $\{-1,-2\}\cup T$.
+Intuitively, $\aliexecmode$ is $-1$ if no thread is currently executing an atomic block, is $t$ if thread $t$ is executing an atomic block.
+When $\aliexecmode$ is set to $-2$, it denotes an assertion violation on occurrence of which all threads are blocked.
 
-\newcommand{\aliruns}{\ensuremath{\mathbf{R}}}
-\newcommand{\alirunsx}[2]{\ensuremath{\aliruns_{#1}(#2)}}
+We use dot notation to access individual components of a state $q$; e.g. $q.\alicontrol$, $q.\alivaluation$.
+We drop $q$ when the state is understood from the context.
+The distinguished state $q_{init}$ is the {\em initial state}, such that $q_{init}.\alicontrol=\varepsilon$, $q_{init}.\alivaluation$ maps everything to 0, $q_{init}.\alibuffer=\varepsilon$, and $q_{init}.\aliexecmode=-1$.
+
+The transition relation $\rightarrow\subseteq Q\times Tr\times Q$ of $\aliltsx P$ is given in Fig.~\ref{fig:operational-semantics}.
+The label of a transition is written as $\tau=R,t:s$; it is called an $R$ transition, {\em executed by} thread $t$, and the {\em execution of} statement $s$ when $s\neq \varepsilon$.
+The auxiliary predicate $\alienabled$ used in the premise of a rule determines whether a particular thread can execute.
+Formally, $\alienabledx t$ is true iff $\aliexecmode\in\{-1,t\}$. 
+The notation $\alivaluation \alievalx e t$ denotes the value of expression $e$ when each free variable $x$ is replaced with $\alivaluationx x$ and {\tt tid} is replaced with $t$.
 
 
 \paragraph{Program runs.}
 A {\em run} of program $P$ is an alternating sequence of states and transition labels conforming to the operational semantics of Fig.~\ref{fig:operational-semantics}.
-Formally, a run $\alisequencex r$ is a sequence $q_0t_1q_1\ldots t_kq_k$, where $q_i$'s are states of $\aliltsx P$ and for each $i\in[1,k]$, $q_{i-1}\xrightarrow{t_i}q_i$ is a transition of $\aliltsx P$.
-The sequence of transitions $t_1\ldots t_k$ is called the {\em trace} of the run, denoted by $\alitracex {\alisequencex r}$.
+Formally, a run $\alisequencex r$ is a sequence $q_0\tau_1q_1\ldots \tau_kq_k$, where $q_i$'s are states of $\aliltsx P$, $q_0=q_{init}$, and for each $i\in[1,k]$, $q_{i-1}\xrightarrow{\tau_i}q_i$ is a transition of $\aliltsx P$.
+The sequence of transitions $\tau_1\ldots \tau_k$ is called the {\em trace} of the run, denoted by $\alitracex {\alisequencex r}$.
+The run is {\em failed} if $q_k.\aliexecmode=-2$.
+It is called {\em terminated} if $q_k.\alicontrolx t=\varepsilon$ for all $t$.
+A run that is either failed or terminated is {\em complete}.
 
-A program run is {\em TSO compliant} if it does not contain the {\sc \small Wr} transition.
-Similarly, a program run is {\em SC compliant} if it does not the {\sc \small WrB, WrM} transitions.
-For notational convenience we leave {\sc \small Fnc} rules in SC compliant runs.
+Observe that we have not constrained the set of thread identifiers in the operational semantics.
+The {\em restriction} of $P$ to $T$, written $P[T]$, gives the set of all runs of $P$ in which each transition is executed by some thread $t\in T$. 
+
+A program run is {\em TSO-compliant} if it does not contain the {\sc \small Rd, Wr} transitions.
+Similarly, a program run is {\em SC-compliant} if it does not contain the {\sc \small WrB, WrM, RdB} and {\sc \small RdM} transitions.
+%For notational convenience we leave {\sc \small Fnc} rules in SC compliant runs.
 It is easy to show that in SC compliant runs {\alifence} and {\aliskip} are interchangeable. 
-Let $\alirunsx {tso} P$ denote the set of all TSO compliant runs of $P$.
-Similarly, let $\alirunsx {sc} P$ denote the set of all SC compliant runs of $P$.
+Let $\alirunsx {tso} P$ denote the set of all TSO-compliant runs of $P$.
+Similarly, let $\alirunsx {sc} P$ denote the set of all SC-compliant runs of $P$.
+
 
 \begin{figure*}[th]
 \[

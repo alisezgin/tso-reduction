@@ -1,0 +1,106 @@
+% !TEX root = main-tsoreduction.tex
+
+\begin{figure*}[th]
+\begin{mathpar}
+\fbox{$(\alicontrol,\alivaluation,\alibuffer,\aliexecmode)\xrightarrow{Rl,t:s}(\alicontrol',\alivaluation',\alibuffer',\aliexecmode')$}\\
+
+\inferrule*
+{Rl=\textnormal{\sc\small Init} \\ M_i\in P \\ M_i= n()\ \{c\} \\\\ 
+\alicontrolx t =\varepsilon \\ s=a \\ \alienabledx t}
+{\alivaluation'=\alivaluation[(t,\alireg_{in})\mapsto a] \\ \alicontrol'=\alicontrol[t\mapsto \alifirstx C]}
+
+\inferrule*
+{Rl=\textnormal{\sc\small Rd} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
+s=r:=\alimemx e \\ \alienabledx t}
+{\alivaluation'=\alivaluation[(t,r)\mapsto \alivaluationx {\alivaluation{\alievalx e}t}] \\ \alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'}]}
+
+\inferrule*
+{Rl=\textnormal{\sc\small RdM} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\ 
+\alivaluation{\alievalx e}t \notin \alibufferx t \\ s=r := \alimemx e \\ \alienabledx t}
+{\alivaluation'=\alivaluation[(t,r)\mapsto \alivaluationx {\alivaluation{\alievalx e}t}] \\ \alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'}]}
+
+\inferrule*
+{Rl=\textnormal{\sc\small RdB} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\ 
+s=r := \alimemx e \\ \alivaluation{\alievalx e}t \in \alibufferx t \\ \alienabledx t}
+{\alivaluation'=\alivaluation[(t,r)\mapsto \alireadbufferx t {\alivaluation{\alievalx e}t}] \\ \alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'}]}
+
+
+\inferrule*
+{Rl=\textnormal{\sc\small Wr} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
+s=\alimemx e := r \\ \alienabledx t}
+{\alivaluation'=\alivaluation[(t,r)\mapsto {\alivaluation \alievalx e}t] \\ \alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'}]}
+
+\inferrule*
+{Rl=\textnormal{\sc\small WrB} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\ 
+\alibufferx t = \alisequencex {b} \\ s=\alimemx e := r \\ \alienabledx t}
+{\alibuffer'=\alibuffer[t\mapsto \alisequencex b \cdot(\alivaluation{\alievalx e}t,\alivaluationx {t,r})] \\ \alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'}]}
+
+\inferrule*
+{Rl=\textnormal{\sc\small WrM} \\ \alibufferx t = (a,d)\cdot\alisequencex {b} \\\\
+s=\varepsilon \\ \alienabledx t}
+{\alibuffer'=\alibuffer[t\mapsto \alisequencex b] \\ \alivaluation'=\alivaluation[a\mapsto d]}
+
+\inferrule*
+{Rl=\textnormal{\sc\small WrR} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\ 
+s= r := e \\ \alienabledx t}
+{\alivaluation'=\alivaluation[(t,r)\mapsto \alivaluation{\alievalx e}t] \\ \alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'}]}
+
+\inferrule*
+{Rl=\textnormal{\sc\small Fnc} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
+\alibufferx t = \varepsilon \\ s=\alifence \\ \alienabledx t}
+{\alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'}]}
+
+\inferrule*
+{Rl=\textnormal{\sc\small IfT} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
+\alivaluation{\alievalx e}t=\alitrue \\ s=\aliifelsex e {c_1} {c_2} \\ \alienabledx t}
+{\alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'} \cdot \alifirstx {c_1}]}  
+
+\inferrule*
+{Rl=\textnormal{\sc\small IfE} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
+\alivaluation{\alievalx e}t=\alifalse \\ s=\aliifelsex e {c_1} {c_2} \\ \alienabledx t}
+{\alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx{l'} \cdot \alifirstx {c_2}]}  
+
+\inferrule*
+{Rl=\textnormal{\sc\small WhI} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
+\alivaluation{\alievalx e}t=\alitrue \\ s=\aliwhilex e {c} \\ \alienabledx t}
+{\alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot l' \cdot {\alifirstx {c}}]}
+
+\inferrule*
+{Rl=\textnormal{\sc\small WhE} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
+\alivaluation{\alievalx e}t=\alifalse \\ s=\aliwhilex e {c} \\ \alienabledx t}
+{\alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx {l'}]}
+
+\inferrule*
+{Rl=\textnormal{\sc\small Skp} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\ 
+s=\aliskip \\ \alienabledx t}
+{\alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx {l'}]}
+
+\inferrule*
+{Rl=\textnormal{\sc\small AtB} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
+s=\aliatomicx c \\ \aliexecmode = -1}
+{\alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx {l'} \cdot \aliatomicexitlabel \cdot \alifirstx {c}] \\ \aliexecmode' = t}
+
+\inferrule*
+{Rl=\textnormal{\sc\small AtE} \\ \alicontrolx t = \alisequencex l \cdot \aliatomicexitlabel \\\\
+s=\varepsilon \\ \aliexecmode=t}
+{\alicontrol'=\alicontrol[t\mapsto \alisequencex l] \\ \aliexecmode' = -1}
+
+\inferrule*
+{Rl=\textnormal{\sc\small AsT} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
+\alivaluation{\alievalx e}t=\alitrue \\ s=\aliassertx{e} \\ \alienabledx t}
+{\alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx {l'}]}
+
+\inferrule*
+{Rl=\textnormal{\sc\small AsF} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
+\alivaluation{\alievalx e}t=\alifalse \\ s=\aliassertx{e} \\ \alienabledx t}
+{\aliexecmode' = -2}
+
+\inferrule*
+{Rl=\textnormal{\sc\small Asm} \\ \alicontrolx t = \alisequencex l \cdot l' \\ \alilabelx s = l' \\\\
+\alivaluation{\alievalx e}t=\alitrue \\ s=\aliassumex{e} \\ \alienabledx t}
+{\alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx {l'}]}
+\end{mathpar}
+\caption{Operational semantics for TSO and SC.}
+\label{fig:operational-semantics}
+\end{figure*}
+
