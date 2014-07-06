@@ -39,7 +39,7 @@ This result depends on a strong constraint, all updates being left-movers or all
 In what follows we will provide a series of incrementally more general results.
 Fix a labelled program $P=\{m_1,\ldots,m_n\}$.
 Let $\sigma$ be a partitioning of (the methods of) $P$.
-A {\em $\sigma$-partitioned runs} of $P[T]$ is the subset of $\alirunsx {tso} {P[T]}$ containing all and only those runs in which each $t$ executes methods from the same partition.
+The {\em $\sigma$-partitioned runs} of $P[T]$ is the subset of $\alirunsx {tso} {P[T]}$ containing all and only those runs in which each $t$ executes methods from the same partition.
 \begin{lemma}
 Let $P$ be a program and $\sigma$ be a partitioning of $P$.
 If $\sigma$ is such that in $\sigma$-partitioned runs of $P[T]$ for each partition, all remote write actions executed by all the methods in the partition are left-movers or all local actions executed by all the methods in the partition are right-movers, then $\sigma$-partitioned runs are SC-like.
@@ -47,7 +47,7 @@ If $\sigma$ is such that in $\sigma$-partitioned runs of $P[T]$ for each partiti
 Call a subset of $\alirunsx {tso} {P[T]}$ {\em singular} if it contains all and only those runs in which each thread $t\in T$ runs at most one method; i.e. the {\sc\small Init}-transition is executed at most once by each $t$.
 Then the following is a particular instance of the previous result.
 \begin{corollary}
-All singular TSO runs of $P[T]$ are SC-like if for each method $m_i$, either all of its local actions are right-movers in $\tsoequivstrict$ or all of its remote write actions are left-movers. 
+All singular TSO runs of $P[T]$ are SC-like if for each method $m_i$, either all of its local actions are right-movers in $\tsoequiv$ or all of its remote write actions are left-movers in $\tsoequiv$. 
 \end{corollary}
 We can specialize even further, obtaining the following, which is also implied by triangular-race freedom of \cite{Owe2009}.
 \begin{corollary}
@@ -64,22 +64,76 @@ This substitution decreases the number of possible interleavings, which in turn 
 Indeed, the latter is a step towards the ultimate goal of analyzing the whole program under SC semantics.
 For the following fix an update statement $s$ and let $s^{loc}$ and $s^{rem}$ denote its local and remote write actions.
 \begin{lemma}
-If in any TSO run in which $s^{loc}$ is executed by some thread $t$, all the combined write actions executed by $t$ up to the occurrence of $s^{loc}$ are atomic and $s$ is left-mover, then $s^{loc}$ and $s$ are atomic.
+If in any TSO run in which $s^{loc}$ is executed by some thread $t$, all statements executed by $t$ up to the occurrence of $s^{loc}$ are atomic and $s^{rem}$ is left-mover in $\tsoequiv$, then $s$ is atomic.
 \end{lemma}
-This naturally leads to the following special instance which gives an insight about how fence statements lead to SC-like programs.
-\begin{corollary}
-If in any TSO run in which $s^{loc}$ is executed by thread $t$, there exists a fence action executed by $t$ preceding $s^{loc}$, no other local write actions by $t$ occur between the two actions and $s$ is left-mover, then $s^{loc}$ and $s$ are atomic.
+Observe that we have to require all the statements executed by $t$ preceding $s^{loc}$ be atomic.
+To understand why we need this (sufficiency) condition, consider the following run:
+\[
+\mathbf{\alpha}\ \cdot\ s^{loc}\ \cdot\ \mathbf{\beta}_1\ \cdot\ \remwritex t x v\ \cdot\ \mathbf{\beta}_2\ \cdot\ s^{rem}
+\]
+If the remote write action $\remwritex t x v$, whose matching local action must precede $s^{loc}$, cannot move to the left of every action in $\beta_1$, then even though $s^{rem}$ itself is a left-mover, there is not an equivalent run in which $s^{loc}$ and $s^{rem}$ are adjacent because of the presence of $\remwritex t x v$ in between the two.
+
+However, the above argument leads to the following special instance which incidentally gives an insight about how fence statements can lead to SC-like programs.
+\begin{corollary}\label{cor:prec-fence}
+If in any TSO run in which $s^{loc}$ is executed by thread $t$, there exists a fence action executed by $t$ preceding $s^{loc}$, no other local write actions by $t$ occur between the two actions and $s^{rem}$ is left-mover, then $s$ is atomic.
 \end{corollary}
-This means that, unlike the general case, in order to argue that a write immediately following a fence statement is atomic, we only need to prove that its matching remote write action is left-mover. 
-There is a dual of this result which we state next.
+Essentially, the antecedent of the Cor.~\ref{cor:prec-fence} implies the absence of $\remwritex t x v$ of the above sample run.
+Thus, unlike the general case, in order to argue that a write immediately following a fence statement is atomic, we only need to prove that its matching remote write action is left-mover. 
+There is a dual of this result.
 \begin{lemma}
-If in any TSO run in which $s^{loc}$ is executed by thread $t$, there does not exist any read action executed by $t$ until the occurrence of $s$, then $s^{loc}$ is right-mover and $s^{loc}$ and $s$ are atomic.
+If in any TSO run in which $s^{loc}$ is executed by thread $t$, there does not exist any read action executed by $t$ until the occurrence of $s^{rem}$, then $s$ is atomic.
 \end{lemma}
-The next result which is a special case of the previous result explains why the use of fence statements restricts the runs of a TSO program to SC-like behaviors.
-\begin{corollary}
+To see why this holds, observe that a local write action is always a right-mover because the changes it makes are invisible to other threads.
+Then, to conclude that a write statement is atomic, one has to consider the mover type of all possible local actions that can come between the local and remote write actions.
+A well-known way of restricting this sequence of actions is through the use of a fence, which we state next as a special instance of the previous result which is yet another way fence statements can result in  SC-like behaviors.
+\begin{corollary}\label{cor:succ-fence}
 Let $s;C;\alifence$ be a code block in some $m_i$ such that $C$ does not contain any read of shared memory (no statements of the form $r:=\alimemx e$).
 Then $s$ and all the writes in $C$ are atomic.
 \end{corollary}
 
+\paragraph{Compositionality.}
+Library implementations can be seen as programs which are to be executed in arbitrary contexts.
+Unlike SC semantics where atomicity of methods carry over to arbitrary execution contexts as long as there is a separation of memory footprints, atomicity of methods under TSO semantics does not immediately translate into atomicity in other execution contexts even when the footprints are distinct.
+We let {\em non-interfering execution context} for $P$ denote any program $P'$ which does not access any location that $P$ does.
+We will now state our main compositionality results.
 
-{\sc Code snippets demonstrating the results.}
+\begin{theorem}[Compositionality-Remote]
+Let $m$ be a method in $P$ such that all of its write statements are proved atomic by showing that its remote write actions are left-movers.
+Then, $m$ remains atomic in any non-interfering execution context for $P$ which executes a fence statement every time $m$ completes and returns.
+\end{theorem}
+\begin{theorem}[Compositionality-Local]
+Let $m$ be a method in $P$ such that all of its write statements are proved atomic by showing that its local actions are right-movers.
+Then, $m$ remains atomic in any non-interfering execution context which executes a fence statement before each call to $m$.
+\end{theorem}
+These follow from the assumption of non-interference and Cor.~\ref{cor:succ-fence} and Cor.~\ref{cor:prec-fence}.
+These results show that there is no silver bullet for placing a fence statement relative to library calls. 
+The safe move is to delimit each call by fence statements, but one can do away with one or both (if the method itself has a beginning or ending fence statement) of those statements after checking the atomicity of each write in the method.
+
+\paragraph{Completeness.}
+We end this section by stating the completeness of reduction.
+Call a TSO run {\em unambiguous} if there do not exist two distinct write actions updating the same location with the same value.
+If the definition of $\tsoequiv$ is strengthened to require that the mapping between reads and the writes from which they obtain their value (known usually as the reads-from mapping), then the requirement of unambiguity is not needed.
+Restricted to the set of unambiguous runs, we have the following result.
+\begin{theorem}
+Let $P$ be a program and $s$ a memory update statement in $P$.
+Let $\alisequencex r$ be an unambiguous TSO run of $P$, in the form 
+\[
+\alpha\ \cdot\ s^{loc}\ \cdot\ \beta\ \cdot s^{rem}
+\]
+where $s^{loc}$ is executed by $t$.
+Then $\alisequencex r$ has an $\tsoequiv$-equivalent run in which $s$ is atomic iff there is a permuation of $\beta\aliperm\beta_1\beta_2$ such that 
+\[
+\alisequencex r\ \tsoequiv\ \alpha\ \cdot\ \beta_1\ \cdot\ s^{loc}\ \cdot\ s^{rem}\ \cdot\ \beta_2 
+\]
+\end{theorem}
+\begin{proof}[Proof (Sketch)]
+One direction is by definition.
+For the other direction, assume that such a permutation does not exist and let $\alilenx {\beta}=k$.
+Without loss of generality, assume that $s^{loc}$ cannot move to the right of $\beta[1]$ and $s^{rem}$ cannot move the left of $\beta[k]$.
+Otherwise, move both actions to the right and to the left until such actions which must exist by the assumption are found.
+Then, it must be the case that there is an increasing sequence $i_1,\ldots,i_n$ of indices in $[1,k]$ such that $\beta[i_j]$ cannot move to the right of $\beta[i_{j+1}]$ for $1<j<n$ with $i_1=1$ and $i_n=k$.
+But if such a sequence exists, $s$ cannot be atomic by the unambiguity assumption.
+\end{proof}
+
+%
+%{\sc Code snippets demonstrating the results.}
