@@ -114,7 +114,7 @@ We end this section by stating the completeness of reduction.
 Call a TSO run {\em unambiguous} if there do not exist two distinct write actions updating the same location with the same value.
 If the definition of $\tsoequiv$ is strengthened to require that the mapping between reads and the writes from which they obtain their value (known usually as the reads-from mapping), then the requirement of unambiguity is not needed.
 Restricted to the set of unambiguous runs, we have the following result.
-\begin{theorem}
+\begin{theorem}\label{thm:completeness}
 Let $P$ be a program and $s$ a memory update statement in $P$.
 Let $\alisequencex r$ be an unambiguous TSO run of $P$, in the form 
 \[
