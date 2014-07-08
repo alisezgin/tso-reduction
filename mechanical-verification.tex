@@ -13,12 +13,13 @@ We illustrate our methodology by verifying the atomicity of writes in double che
 
 
 \begin{figure*}
+{\small
 \begin{tabular}{p{.35\textwidth}p{.3\textwidth}p{.34\textwidth}}
 \begin{alltt}\(RdL(e,r,l)\) \{  
  cnt:=ExecCnt[\(l\)][tid]+1;
  ver:=AdrVer[\(e\)][tid];
  if ver>AdrVer[\(e\)][tido]
- then \{\(r\):=WrVal[e][ver][tid]; \}
+ then \{\(r\):=WrVal[\(e\)][ver][tid]; \}
  else \{\(r\):=mem[\(e\)];
  RdVal[l][cnt][tid]:=r;
  ExecCnt[\(l\)][tid]:=cnt;
@@ -44,7 +45,7 @@ We illustrate our methodology by verifying the atomicity of writes in double che
  cnt:=ExecCnt[\(l\)][tid]+1;
  \(\aliassume\) cnt<=ExecCnt[\(l\)][tido];
  ver:=AdrVer[\(e\)][tid]+1;
- mem[e]:=WrVal[\(e\)][cnt][tido];
+ mem[\(e\)]:=WrVal[\(e\)][cnt][tido];
  AdrVer[\(e\)][tid]:=ver;
  ExecCnt[\(l\)][tid]:=cnt;
 \}\end{alltt} & 
@@ -61,34 +62,35 @@ We illustrate our methodology by verifying the atomicity of writes in double che
  \(\aliskip\);
 \}\end{alltt}
 \end{tabular}
+}
 \caption{The TSO to SC transformation macros.}
 \label{fig:transformation-macros}
 \end{figure*}
 
+
 \subsection{Program Transformation}
 \label{subsec:program-transformation}
-Let $P=(\{m_1,\ldots,m_n\},\alilabel)$ be a program.
-For notational convenience, we let $l_s$ to denote the label $l$ of $s$, i.e. $\alilabelx s=l$.
+Let $P=\{m_1,\ldots,m_n\}$ be a program.
+For notational convenience, we let $l_s$ denote the label $l$ of $s$.%, i.e. $\alilabelx s=l$.
 For a thread identifier set $T$, let $T'$ denote a primed duplicate of $T$ such that $t\in T$ iff $t'\in T'$.
-The {\em split transformation} of $P[T]$ is another program $\alisplitprogx P[T\cup T']=(\{m^{loc}_1,m^{rem}_1,\ldots,m^{loc}_n,m^{rem}_n\},\alilabel')$.
+The {\em split transformation} of $P[T]$ is another program $\alisplitprogx P[T\cup T']=\{m^{loc}_1,m^{rem}_1,\ldots,m^{loc}_n,m^{rem}_n\}$.
 Intuitively, this transformation separates local writes from remote writes by way of adding a new auxiliary thread.
 The execution of method $m_i$ by some thread $t$ will be simulated by the execution of the methods $\aliloctransx {m_i}$ and $\aliremtransx {m_i}$ by threads $t$ and $t'$, respectively.
 For notational convenience, we let $(t')'=t$.
 A transition (or corresponding action) is {\em local} if it is executed by some $t\in T$; otherwise, it is called {\em remote}.
 We will omit the explicit mention of $T$ and $T\cup T'$ in the following.
 %All statement macros keep track of how many times a statement with label $l$ is executed, the value in {\tt StExec[$l$][tid]}.
-
-In order to explicitly split the local and remote writes, we introduce several arrays:
-\begin{itemize}
-\item {\tt AdrVer[$i$][$t$]} holds the version number of updates to $\alimemx i$ by thread $t$.
-\item {\tt WrVal[$i$][$v$][$t$]} holds the value written to $\alimemx i$ with version number $v$ by thread $t$.
-\item {\tt RdVal[$l$][$c$][$t$]} holds the value observed when $t$ executed the statement with label $l$ for the $c^{th}$ time.
-\item {\tt ExecCnt[$l$][$t$]} holds the number of times the statement with label $l$ is executed by $t$.
+In order to explicitly split the local and remote writes, we introduce several arrays:\\
+- {\tt AdrVer[$i$][$t$]} holds the version number of updates to $\alimemx i$ by thread $t$.\\
+- {\tt WrVal[$i$][$v$][$t$]} holds the value written to $\alimemx i$ with version number $v$ by thread $t$.\\
+- {\tt RdVal[$l$][$c$][$t$]} holds the value observed when $t$ executed the statement with label $l$ for the $c^{th}$ time.\\
+- {\tt ExecCnt[$l$][$t$]} holds the number of times the statement with label $l$ is executed by $t$.\\
 %\item {\tt Other[$t$]} holds the thread identifier matching with $t$ (see below).
-\end{itemize}
+%\end{itemize}
 
 Let $s$ be a statement in $m_i$.
 The {\em local transformation} and the {\em remote transformation} of $s$, written as $\aliloctransx s$ and $\aliremtransx s$ respectively, are given below:
+{\small
 \begin{eqnarray*}
  \aliloctransx s  & \stackrel{def}{=} &
   \begin{cases}
@@ -105,21 +107,20 @@ The {\em local transformation} and the {\em remote transformation} of $s$, writt
    s & , \textnormal{otherwise}
   \end{cases}
 \end{eqnarray*}
+}
 By convention, we let $\aliloctransx \varepsilon=\aliremtransx \varepsilon=\varepsilon$.
 We let $\alilabel'$ be such that $\alilabel'(\aliloctransx s)=l_s$ and $\alilabel'(\aliremtransx s)=l_s'$.
 The definitions of the macros $RdL$, $RdR$, etc. are given in Fig.~\ref{fig:transformation-macros}.
-Both of these transformations are extended to code blocks respecting the program order.
+Both local and remote transformations are extended to code blocks respecting the program order.
 Formally, if $C=s;C'$ is a code block, $\aliloctransx C$ and $\aliremtransx C$ are given by $\aliloctransx s; \aliloctransx {C'}$ and $\aliremtransx s; \aliremtransx {C'}$, respectively.
 This way we identify each method $m_i=\{C_i\}$ with two methods $m^{loc}_i=\{\aliloctransx {C_i}\}$ and $m^{rem}_i=\{\aliremtransx {C_i}\}$ by applying $\aliloctrans$ and $\aliremtrans$ to each statement in $m_i$.
 
 
-
-
-\paragraph{Read macros.}
+\paragraph{Macros.}
 A read statement $s=r:=\alimemx e$ by $t$ is simulated by $t$ executing $\aliatomicx{RdL(e,r,l_s)}$ and $t'$ executing $\aliatomicx{RdR(r,l_s)}$.
-The local read starts by reading the execution count $c$ for $s$ and update count to {\alimemx e} by $t$.
+The local read starts by reading the execution count $c$ for $s$ and update count $v$ to {\alimemx e} by $t$.
 It then checks whether it should read from the {\em buffer} or from the {\em memory}.
-If the number of updates done by $t$ (local write actions) and the number of updates done by $t'$ (remote write actions) are equal, then memory is read; otherwise, the latest local write to $\alimemx e$ is read, the value in {\tt WrVal[$e$][ver][$t$]}.
+If the number of updates done by $t$ (local write actions) and the number of updates done by $t'$ (remote write actions) are equal, then memory is read; otherwise, the latest local write to $\alimemx e$ is read, the value in {\tt WrVal[$e$][$v$][$t$]}.
 It registers the value it read with the current execution count into {\tt RdVal[$l_s$][$c$][$t$]}.
 It ends by incrementing the statement execution count.
 
@@ -130,11 +131,11 @@ It ends by incrementing the statement execution count.
 
 Note that, since all macros are within {\aliatomic} blocks, either the whole macro executes or none of it. 
 This implies that the remote read macro can only execute after its associated local read macro has executed.
-An alternative transformation would be to make the local and remote read operations tightly coupled: each local read macro is immediately followed by its associated remote read macro.
+An alternative transformation would be to make the local and remote read operations strictly coupled: each local read macro is immediately followed by its associated remote read macro.
 This would have the advantage of avoiding the assume statement for read macros.
 For the sake of uniformity, though, since such assume statements are essential in capturing the asynchronous nature of remote writes, we opted for this encoding.
 
-\paragraph{Write macros.}
+%\paragraph{Write macros.}
 A write statement $s=\alimemx e:=r$ by $t$ is simulated by $t$ executing $\aliatomicx{WrL(e,r,l_s)}$ and $t'$ executing $\aliatomicx{WrR(e,l_s)}$.
 The local write starts by reading the current statement count $c$ for $s$ and update count $v$ to {\alimemx e} by $t$.
 It then registers the current update value into {\tt WrVal[$e$][$v$][$t$]}.
@@ -145,26 +146,30 @@ It then ensures that the current macro is enabled by checking that the number of
 If that is the case, the remote update count for $e$ is updated and the value written by the local counterpart, the value in {\tt WrVal[$e$][$c$][$t$]}, is written into location $\alimemx e$.
 It ends by incrementing the update and statement execution counts done by $t'$.
 
-\paragraph{Fence macros.}
+%\paragraph{Fence macros.}
 A fence statement $s=\alifence$ by $t$ is simulated by $t$ executing $\aliatomicx{FenceL}$ and $t'$ executing $\aliatomicx{FenceR}$.
 Recall that $t$ can execute $\alifence$ only when its store buffer is empty, i.e. all the remote write actions corresponding to the local write actions by $t$ have occurred.
 In order to ensure this, local fence blocks until for every location $e$, the local update count is equal to the remote update count (note that the remote update count can never exceed the local update count). 
-The remote fence is simply set to be no-op, i.e. \aliskip.
+The remote fence is set to \aliskip.
 
 It might seem counter-intuitive to give the remote thread the capability of moving beyond a fence statement when the local has not executed yet, but as we shall see where exactly the remote fence occurs is inconsequential to the soundness argument.
 
 %We set $T'$ be the set of {\em primed} thread identifiers derived from $T$, such that $t'\in T'$ iff $t\in T$.
 In order to avoid inessential technicality, we modify the operational semantics.
 We update the rule {\sc\small Init} to account for the local-remote pairing threads.
+{\small
 \begin{mathpar}
 \inferrule*
 {Rl=\textnormal{\sc\small Init'} \\ M_i\in P \\ M_i= n(a)\ \{C\} \\ \alicontrolx t =\varepsilon}
 {\alivaluation[(t,\alireg_{in})\mapsto a] \\ \alicontrol[t\mapsto \alifirstx {\tau_l(C)}, t'\mapsto \alifirstx {\tau_r(C)}]}
 \end{mathpar}  
+}
 We change the definition of {\alienabledx t} as follows:
+{\small
 \[
 \alienabledx t \stackrel{def}{=} (\aliatomiclock=-1) \ \vee\ (\aliatomiclock=t)\ \vee\ (\aliatomiclock=t')
 \]
+}
 Finally, we introduce a new keyword {\tt tido} such that for any valuation $\alivaluation$ and thread $t$, we have $\alivaluation\alievalx {\mathtt{tido}} t=t'$.
 
 \newcommand{\locseqequiv}{\ensuremath{\sim_l}}
@@ -178,7 +183,7 @@ Finally, we introduce a new keyword {\tt tido} such that for any valuation $\ali
 \label{subsec:soundness}
 In this subsection, we prove that the program transformation defined above is sound.
 That is, $P$ running under TSO semantics is equivalent to $\alisplitprogx P$ running under SC semantics.
-To that end, we define an equivalence relation $\locseqequiv$ over the SC runs of $\alisplitprogx P$, assign a representative to each $\locseqequiv$ class, and establish the bijective relation between the representatives and the TSO runs of $P$.
+To that end, we define an equivalence relation $\locseqequiv$ over the SC runs of $\alisplitprogx P$, assign a representative to each $\locseqequiv$ class, and establish a bijection between the representatives and the TSO runs of $P$.
 
 Let us begin with an important observation about the orderings of local and remote transitions.
 \begin{lemma}\label{lem:transformation-bijection}
@@ -190,7 +195,7 @@ Furthermore, if $x_l$ is a local read or write transition and $x_r=\mu(x_l)$ the
 The bijection is constructed by pairing the $k^{th}$ local transition executed by $t$ with the $k^{th}$ remote transition executed by $t'$.
 Observe that the only time the two threads can diverge is when they read from memory, i.e. a {\sc\small Rd} transition.
 But in that case, the value read by the local thread is registered and the remote read gets that value.
-The second part follows from the use of {\aliassume} statements in the remote actions and the bijection can be established by matching each local transition with a remote transition such that they both observe the same (unique) value for {\tt cnt}.
+The second part follows from the use of {\aliassume} statements in the remote actions and showing that the constructed bijection pairs each local transition with a remote transition when they both observe the same (unique) value for {\tt cnt}.
 \end{proof}
 
 Let $\alisequencex r$ and $\alisequencex {r'}$ be permutationally equivalent SC-compliant runs of $\alisplitprogx P$.
@@ -222,29 +227,30 @@ Uniqueness comes from the fact that within the equivalence class the relative or
 
 
 We extend the definition of computationally equal to enable a comparison between TSO-runs of $P$ and the SC-runs of $\alisplitprogx P$ such that the requirement for equality between states with matching index values is replaced by an equality between the components $\alivaluation$, $\alicontrol$ both restricted to $T$ and $\aliexecmode$ of the states.
+Formally, a TSO-run $\alisequencex r$ of $P$ and an SC-run $\alisequencex {r'}$ of $\alisplitprogx P$ are computationally equal if there are two sequences of increasing index values, $i_1\ldots i_m$ and $j_1\ldots j_m$ over the state indices that occur in $\alisequencex r$ and $\alisequencex {r'}$ such that $i_1=j_1=0$, $i_m=\alilenx {\alisequencex r}$, $j_m=\alilenx {\alisequencex {r'}}$, for all $1\leq n\leq m$ we have $q_{i_n}.\aliexecmode=q'_{j_n}.\aliexecmode$, $q_{i_n}.\alivaluation=q'_{j_n}.\alivaluation$, $q_{i_n}.\alicontrol=q'_{j_n}.\alicontrol$ both restricted to the domains of $q'_{j_n}$, and all transitions from $q_{i_n}$ to $q_{i_{n+1}}$ and from $q'_{j_n}$ to $q'_{j_{n+1}}$ are executed by thread $t$ or $t'$.
 We conclude by stating the main result of this section.
 
 \begin{theorem}\label{thm:soundness}[Soundness of Transformation]
-Let $P$ be a program, $\alisequencex r$ be a TSO-run of $P$.
-Then, for every TSO-run of $P$ there exists a computationally equal canonical SC-run of $\alisplitprogx P$,
-and for every SC-run of $\alisplitprogx P$, there exists a computationally equal TSO-run of $P$. 
+Let $P$ be a program.
+Then, for every singular TSO-run of $P$ there exists a computationally equal singular canonical SC-run of $\alisplitprogx P$,
+and for every singular SC-run of $\alisplitprogx P$, there exists a computationally equal singular TSO-run of $P$. 
 \end{theorem}
 \begin{proof}[Proof (Sketch)]
 Let $\alisequencex r$ be a TSO-compliant run of $P$.
 We construct a computatinally equal SC-run $\alisequencex {r'}$ of $\alisplitprogx P$.
-Every {\sc\small Init} transition of $\alisequencex r$ is replaced with an {\sc\small Init'} transition.
-Every $R,t:s$ with $R\in \{\textnormal{\sc\small RdM},\textnormal{\sc\small RdB}\}$ is replaced with $\textnormal{Rd},t:\aliloctransx s$ followed by $\textnormal{Rd},t:\aliremtransx s$.
-Every $\textnormal{\sc\small WrB},t:s$ is replaced with $\textnormal{\sc\small Wr},t:\aliloctransx s$.
-Every $\textnormal{\sc\small WrM},t:s$ is replaced with $\textnormal{\sc\small Wr},t':\aliremtransx s$.
+The {\sc\small Init} transition of $\alisequencex r$ is replaced with an {\sc\small Init'} transition.
+$R,t:s$ with $R\in \{\textnormal{\sc\small RdM},\textnormal{\sc\small RdB}\}$ is replaced with $\textnormal{\sc\small Rd},t:\aliloctransx s$ followed by $\textnormal{Rd},t:\aliremtransx s$.
+$\textnormal{\sc\small WrB},t:s$ is replaced with $\textnormal{\sc\small Wr},t:\aliloctransx s$.
+$\textnormal{\sc\small WrM},t:s$ is replaced with $\textnormal{\sc\small Wr},t':\aliremtransx s$.
+$\textnormal{\sc\small Fnc},t:s$ is replaced with $\textnormal{\sc\small Asm},t:\aliloctransx s$ followed by $\textnormal{\sc\small Skp},t':\aliremtransx s$.
 Finally, all other transitions $R,t:s$ are replaced with $R,t:\aliloctransx s$ followed by $R,t':\aliremtransx s$.
 That such a run exists follows from Lemma~\ref{lem:transformation-bijection}.
-
-For the other direction, it is enough to consider only canonical SC-runs by Lem.~\ref{lem:canonical}.
-Replace all adjacent local and remote transitions $R,t:\aliloctransx s$ followed by $R,t':\aliremtransx s$ with $R,t:s$, when $R\neq \textnormal{\sc\small Wr}$ and $s\neq\alifence$.
-If $s=\alifence$, then replace the transitions $\textnormal{\sc\small Asm},t:\aliloctransx s$ followed by $\textnormal{\sc\small Skp},t':\aliremtransx s$ with $\textnormal{\sc\small Fnc},t:s$.
-If $R=\textnormal{\sc\small Wr}$, then replace $R,t:\aliloctransx s$ with $\textnormal{\sc\small WrB},t:s$, and replace $R,t':\aliremtransx s$ with $\textnormal{\sc\small WrM},t:s$.
+For the other direction, by Lem.~\ref{lem:canonical}, it is enough to consider only canonical SC-runs  for which we apply the above construction in the opposite direction.
+%Replace all adjacent local and remote transitions $R,t:\aliloctransx s$ followed by $R,t':\aliremtransx s$ with $R,t:s$, when $R\neq \textnormal{\sc\small Wr}$ and $s\neq\alifence$.
+%If $s=\alifence$, then replace the transitions $\textnormal{\sc\small Asm},t:\aliloctransx s$ followed by $\textnormal{\sc\small Skp},t':\aliremtransx s$ with $\textnormal{\sc\small Fnc},t:s$.
+%If $R=\textnormal{\sc\small Wr}$, then replace $R,t:\aliloctransx s$ with $\textnormal{\sc\small WrB},t:s$, and replace $R,t':\aliremtransx s$ with $\textnormal{\sc\small WrM},t:s$.
 \end{proof}
-
+The restriction to singular runs is to avoid complex characterization of canonical runs; our result holds for all TSO-runs of $P$.
 
 
 
@@ -253,59 +259,106 @@ If $R=\textnormal{\sc\small Wr}$, then replace $R,t:\aliloctransx s$ with $\text
 \subsection{Example - Double Checked Initialization}
 \label{subsec:example-double-check}
 
-\begin{figure}[ht]
+\begin{figure*}[ht]
+{\small
+\begin{tabular}{p{.2\textwidth}|p{.24\textwidth}p{.24\textwidth}|p{.24\textwidth}}
 \begin{alltt}DoubleCheckInit() 
-\{
  r:=\(Obj\);
  \(\aliif\) r=0 \(\alithen\) 
- \{
-  \(\aliatomic\) \{ \(\aliassume\) {\(Lck\)=0}; \(Lck\):=tid; \(\alifence\); \}
+   \(\aliatomic\)  
+     \(\aliassume\) {\(Lck\)=0}; 
+     \(Lck\):=tid; 
+     \(\alifence\); 
   r:=\(Obj\);
-  \(\aliif\) r=0 \(\alithen\) \{ r:=42; \(Obj\):=r; \}
-  \(Lck\):=0;
- \}
-\}\end{alltt}
-\caption{The code for double check initialization. The parameter {\tt a} holds the address for {\tt Obj}.}
+  \(\aliif\) r=0 \(\alithen\) 
+    r:=42; \(Obj\):=r;
+  \(Lck\):=0;\end{alltt}
+&
+\begin{alltt}DoubleCheckInitL()
+ \(RdL(Obj,\)r\(,l\sb{1})\);
+ \(\aliif\) r=0 \(\alithen\) 
+   \(\aliatomic\)  
+     \(RdL(Lck,\)r'\(,l\sb{2})\); 
+     \(\aliassume\) {r'=0}; 
+     \(WrL(Lck,\)tid\(,l\sb{3})\); 
+     \(FenceL\); 
+  \(RdL(Obj,\)r\(,l\sb{4})\);
+  \(\aliif\) r=0 \(\alithen\) 
+    r:=42; \(WrL(Obj,\)r\(,l\sb{5})\);
+  \(WrL(Lck,\)0\(,l\sb{6})\);\end{alltt}
+&
+\begin{alltt}DoubleCheckInitR()
+ \(RdR(\)r\(,l\sb{1})\);
+ \(\aliif\) r=0 \(\alithen\) 
+   \(\aliatomic\)  
+     \(RdR(\)r'\(,l\sb{2})\); 
+     \(\aliassume\) {r'=0}; 
+     \(WrR(Lck,l\sb{3})\); 
+     \(FenceR\); 
+  \(RdR(\)r\(,l\sb{4})\);
+  \(\aliif\) r=0 \(\alithen\) 
+    r:=42; \(WrR(Obj,l\sb{5})\);
+  \(WrR(Lck,l\sb{6})\);\end{alltt}
+&
+\begin{alltt}DoubleCheckInit() 
+\{
+ if \(Obj=0\) then r:=\(Obj\);
+ else r:=\(\alihavocval\);
+ \(\aliif\) r=0 \(\alithen\) 
+   \(\aliatomic\) 
+     \(\aliassume\) {\(Lck\)=0}; 
+     \(Lck\):=tid; 
+     \(\alifence\);
+  r:=\(Obj\);
+  \(\aliif\) r=0 \(\alithen\) 
+    r:=42; \(Obj\):=r;
+  \(Lck\):=0;\end{alltt}
+\end{tabular}
+}
+\caption{The code for double check initialization; its transformed SC-equivalent transformation; abstracted TRF code.}
 \label{fig:double-check}
-\end{figure}
+\end{figure*}
 
-Consider the code given in Fig.~\ref{fig:double-check}, which is derived from double checked initialization.
+Consider the code given on the leftmost column in Fig.~\ref{fig:double-check}, which is derived from double checked initialization.
 The objective of the procedure is to ensure that a shared object $Obj$ is initialized exactly once.
-In order to simplify presentation, we assume that $Obj$ is initialized to 42 known at compile time.
+In order to simplify presentation, we assume that $Obj$ should be initialized to 42 is known at compile time.
 
 The procedure starts by checking whether the object of interest $Obj$ has already been initialized.
 If $Obj$ has indeed been initialized, the procedure terminates.
 Otherwise, the procedure switches to the initialization phase.
 This phase starts by acquiring a (global) lock which protects the initialization operation on the object.
 If the lock is available, which is when $Lck$ is equal to 0, it is acquired by setting $Lck$ to the thread identifier of the current thread, {\tt tid}, and flushing the contents of the buffer ensuring the global visibility of the lock being acquired.
-Interestingly enough, this is the only place in the code where a fence is used.
+%This is the only place in the code where a fence is used.
 
-After successfully acquiring the lock, the current state of $Obj$ is checked again.
+After acquiring the lock, the current state of $Obj$ is checked again.
 This is necessary to ensure that no other (concurrent thread) has initialized $Obj$ in the meantime.
 If $Obj$ is initialized by some other thread, the lock is released by resetting $Lck$ back to 0 and the procedure terminates.
-Otherwise, $Obj$ is assigned to 42, which is followed by the release of the lock and the termination of the procedure.
+Otherwise, $Obj$ is assigned to 42 followed by the release of the lock and the termination of the procedure.
 
 \paragraph{Challenges.}
-In order to show that the write to $Obj$ is atomic, one has to prove that its remote write is a left-mover.
+The transformed method is given in the middle column of Fig.~\ref{fig:double-check}, which following our rules yields two separate methods that run in parallel.
+In order to show that the write to $Obj$ is atomic, one has to prove that its remote write, $WrR(Obj,l_5)$ is a left-mover.
 In its current form, write to $Obj$ conflicts with all the accesses to $Obj$ executed by other threads.
-It is possible to remove two of those conflicts by annotating the $Lck$ protected code with an auxiliary variable which is set to {\tt tid} during lock acquire and reset to 0 after release and asserting that during the read and the write actions in the lock protected region the auxiliary variable must be equal to {\tt tid}.\footnote{This is standard approach used in proving atomicity of lock protected regions using reduction; see~\cite{EQT2009}.} 
+It is possible to remove two of those conflicts by annotating the $Lck$ protected code with an auxiliary variable which is set to {\tt tid} during lock acquire and reset to 0 after release and asserting that in the lock protected region the auxiliary variable must be equal to {\tt tid}.\footnote{This is standard approach used in proving atomicity of lock protected regions using reduction; see~\cite{EQT2009}.} 
 
 The other conflict cannot be removed by simple annotation.
 As a matter of fact, due to the unprotected read, the program is TSO-specific.
-Thus, we need to abstract the program which we do similar to the abstraction done in the Send/Receive example of the previous section.
-After the abstraction, the remote write action is established as a left-mover, which ends up showing that the following program is SC-like.\footnote{To avoid clutter, we omit the annotations for the lock region.}
+Thus, we need to abstract the program which we do similarly to the abstraction done in the Send/Receive example of the previous section.
+After the abstraction, the remote write action is established as a left-mover, checked with the {\sc Qed} tool~\cite{EQT2009}.
+With the help of the lock annotations mentioned above, we were also able to show the atomicity of the (two) writes to $Lck$.
+These results imply that the method in the rightmost column of Fig.~\ref{fig:double-check} is SC-like.\footnote{To avoid clutter, we omit the annotations for the lock protected region.}
 
-\begin{alltt}DoubleCheckInit() 
-\{
- if \(Obj=0\) then \{ r:=\(Obj\);\} else \{ r:=\(\alihavocval\); \}
- \(\aliif\) r=0 \(\alithen\) 
- \{
-  \(\aliatomic\) \{ \(\aliassume\) {\(Lck\)=0}; \(Lck\):=tid; \(\alifence\); \}
-  r:=\(Obj\);
-  \(\aliif\) r=0 \(\alithen\) \{ r:=42; \(Obj\):=r; \}
-  \(Lck\):=0;
- \}
-\}\end{alltt}
+%\begin{alltt}DoubleCheckInit() 
+%\{
+% if \(Obj=0\) then \{ r:=\(Obj\);\} else \{ r:=\(\alihavocval\); \}
+% \(\aliif\) r=0 \(\alithen\) 
+% \{
+%  \(\aliatomic\) \{ \(\aliassume\) {\(Lck\)=0}; \(Lck\):=tid; \(\alifence\); \}
+%  r:=\(Obj\);
+%  \(\aliif\) r=0 \(\alithen\) \{ r:=42; \(Obj\):=r; \}
+%  \(Lck\):=0;
+% \}
+%\}\end{alltt}
 
 Note that the abstract program can now be used to prove that $Obj$ is initialized at most once under SC semantics, which implies that the original program under TSO semantics was correct.
 

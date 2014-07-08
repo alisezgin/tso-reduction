@@ -1,9 +1,9 @@
 % !TEX root = main-tsoreduction.tex
 \section{Abstracting TSO programs}
 \label{sec:abstracting-tso-programs}
-The main problem with the existing body of work on TSO program verification is the impossibility of handling programs which do contain TS-specific runs, i.e. programs with triangular races.
+The main problem with the existing body of work on TSO program verification is the compulsory switch to full TSO semantics (or some SC encoding thereof) when a program does contain TSO-specific runs.
 Our approach so far allows us to at least alleviate some of the difficulties in reasoning by showing that certain write statements can be taken to be atomic.
-In this section, we go one step further and show abstraction can be used to turn a program with TSO-specific runs into one that contains only SC-like runs.
+In this section, we go one step further and show that abstraction can be used to turn a program with TSO-specific runs into one that contains only SC-like runs.
 
 %The use of abstraction in reduction was successfully demonstrated in~\cite{EQT2009} in the context of sequentially consistent programs.
 %Since the soundness of the method crucially depends on the atomicity of each action, it was not clear how one can adopt those techniques to weaker memory models.
@@ -21,16 +21,17 @@ We say that $P'$ {\em abstracts} $P$, if one of the following holds:
 \item $P$ does not have a failed run and for each terminated run $\alisequencex r\in\alirunsx {tso} P$, there exists a terminated run $\alisequencex {r'}\in\alirunsx {tso} {P'}$ computationally equal to $\alisequencex r$.
 \end{itemize}
 \end{definition}
-Intuitively, $P'$ abstract $P$ if $P'$ contains an assertion violation or has more behaviors than $P$.
+Intuitively, $P'$ abstracts $P$ if $P'$ contains an assertion violation or has more behaviors than $P$.
 This means that if $P'$ can be proven to contain no assertion violations, then neither does $P$.
 We should note that the other direction, that when $P$ does not contain an assertion violation neither should $P'$, does not hold in general.
 
 Abstraction works as follows.
 Assume that we have a program $P$ with TSO-specific runs.
 We construct an abstraction $P'$ of $P$ such that if $\alisequencex r$ is a TSO-specific run of $P$, then there will be a run $\alisequencex {r'}$ of $P'$ computationally equal to $\alisequencex r$ such that $\alisequencex {r'}$ is SC-like.
-As we shall see computationally equal allows us to remove dependencies between memory reads and writes by abstracting one or both.
+As we shall see computational equality allows us to remove dependencies between memory reads and writes by abstracting one or both.
 
 \begin{table}
+{\small
 \begin{tabular}{ll}
 %$\aliabsrulex {InsertAssert}$ & $s \leadsto \aliatomicx {\aliassertx e; s}$\\
 %$\aliabsrulex {WeakAssume}$ & $\aliassumex e \leadsto \aliassumex e'$\\
@@ -47,13 +48,14 @@ $\aliabsrulex {CtrlNondet}$ &
  & $s'$ and $s''$ are abstractions of $s$\}
 \end{tabular}
 \end{tabular}
+}
 \caption{Substitution rules guaranteeing sound abstraction.}
 \label{tab:abs-rules}
 \end{table}
 
 \paragraph{Abstraction rules.}
 There are many ways to ensure that a syntactic manipulation of $P$ results in another program $P'$ abstracting the former.
-In Table~\ref{tab:abs-rules}, we list two such possible rules which are essentially individual statement replacements that provide a sound abstraction.
+In Table~\ref{tab:abs-rules}, we list two rules which are essentially individual statement replacements that provide a sound abstraction.
 
 %The first substitution rule, {\aliabsrulex {InsertAssert}}, is the insertion of an assertion to any statement. 
 %Recall that an assert statement either does nothing (if its predicate evaluates to true) or results in a failed run.
@@ -65,23 +67,25 @@ In Table~\ref{tab:abs-rules}, we list two such possible rules which are essentia
 The first rule, {\aliabsrulex {ValNondet}}, introduces non-deterministic reads or writes.
 Let $\alihavocval$ be a special notation to denote an expression that can evaluate to any integer value.
 \footnote{Essentially, with the introduction of $\alihavocval$ we are changing the evaluation operator $\alieval$ from a mapping from expressions to values to a mapping from expressions to sets of values.}
-Then replacing any expression with $e$ with $\alihavocval$ is another abstraction.
+Then replacing any expression with $e$ with $\alihavocval$ is an abstraction.
 
 The other rule {\aliabsrulex {CtrlNondet}}, introduces non-deterministic control flow.
 The idea is to replace a statement $s$ by an if-then-else statement such that the branches are not necessarily mutually exclusive, i.e. certain states may satisfy both $e$ and $e'$ of the rule in Table~\ref{tab:abs-rules}.
 This is a sound abstraction because no matter which branch is taken (and at any state at least one of these branches is enabled) whatever $s$ in the original program was doing, and possibly more, will be done by its replacement, $s'$ or $s''$ both of which are abstractions of $s$.  
-For a detailed exposition of how abstraction in conjunction with reduction leads to a natural style of reasoning in safety proofs, the reader can consult~\cite{EQT2009}.
+%For a detailed exposition of how abstraction in conjunction with reduction leads to a natural style of reasoning in safety proofs, the reader can consult~\cite{EQT2009}.
 
 \paragraph{Why it works?}
 Before going into examples, let us briefly discuss how abstraction based on the above rules leads to an SC-like program. 
 Consider the triangular race as given in~\cite{Owe2010} below:
+{\small
 \begin{eqnarray*}
 &\locwritex t A 1 \cdot \alireadx t B 0 \cdot \locwritex u B 2 \cdot \remwritex u B 2\\
 &\ \cdot\ \alireadx v B 2 \cdot \alireadx v A 0 \cdot \remwritex t A 1
 \end{eqnarray*}
+}
 In this TSO-execution, $t$ observes the initial value for $B$, whereas $v$ observes the write to $B$ by $u$ before the write to $A$ by $t$ because the remote write action of $t$ comes after both of the reads of $v$.
 In order to construct an equivalent SC-execution, both statements of $t$ should precede the statement of $u$ because the read of $B$ by $t$ returns the initial value 0.
-However, the first read of $B$ by $v$ should come before the write to $B$ by $u$ followed by second read of $A$ by $v$ which in turn should be follwed by the write to $A$ by $t$.
+However, the first read of $B$ by $v$ should come before the write to $B$ by $u$ followed by second read of $A$ by $v$ which should be follwed by the write to $A$ by $t$.
 These two requirements contradict, hence no equivalent SC-like execution exists.
 
 Looking more closely into the execution, we see that it is impossible to make the local write to $A$ by $t$ synchronous. 
@@ -93,41 +97,44 @@ But this is impossible because it cannot move to the left of $\alireadx v A 0$.
 Now consider the abstraction which removes the read of $B$ by $t$.
 In other words, if the read of $B$ by $t$ is due to the statement $s$={\tt \aliregx 1:=$B$}, consider the program obtained by replacing $s$ with {\tt \aliregx 1:=\alihavocval}.
 This essentially removes the read of $B$ by $t$ from the memory trace since the abstract read does not depend on any write.
-This in turn means that instead of the above execution, we will have the following:
+This in turn means that instead of the above execution, we will have the following memory trace:
+{\small
 \begin{eqnarray*}
 &\locwritex t A 1 \cdot \locwritex u B 2 \cdot \remwritex u B 2\\
 &\ \cdot\ \alireadx v B 2 \cdot \alireadx v A 0 \cdot \remwritex t A 1
 \end{eqnarray*}
+}
 which can be brought into an atomic equivalent form as:
+{\small
 \begin{eqnarray*}
 &\locwritex u B 2 \cdot \remwritex u B 2\\
 &\ \cdot\ \alireadx v B 2 \cdot \alireadx v A 0 \cdot \locwritex t A 1 \cdot \remwritex t A 1
 \end{eqnarray*}
+}
 Observe that even though the memory traces before and after the abstraction are different, the underlying runs will be computationally equal.
 Of course, this is a simple example where the read value by $t$ is not used, so the abstraction might make sense trivially. 
-We next work through an example which demonstrate the power of abstraction: transforming a program into one that is SC-like which can be used to prove safety properties of interest.
+We next work through an example which demonstrates the power of abstraction: transforming a program into one that is SC-like which can then be used to prove safety properties of interest.
  
-\subsection{Send/Receive}
+\subsection{Example - Send/Receive}
 \label{subsec:send-receive}
 
-\begin{figure}[h]
-\begin{tabular}{p{.2\textwidth}p{.2\textwidth}}
+\begin{figure}[th]
+{\small
+\begin{tabular}{p{.25\textwidth}p{.2\textwidth}}
 \begin{alltt}Recv()
- \(Rdy\):=1;
- r[2]:=\(Buf\);
+ \(Rdy\):=1; r[2]:=\(Buf\);
  if r[2]=0 then
    r[1]:=\(Flag\);
-   while r[1]=0 
-     r[1]:=\(Flag\);
+   while r[1]=0 \{r[1]:=\(Flag\);\}
    r[2]:=\(Buf\);\end{alltt}
 &
-\begin{alltt}Send(\(d\))
- \(Buf\):=\(d\);
- r[1]:=\(Rdy\);
+\begin{alltt}Send()
+ \(Buf\):=\(d\); r[1]:=\(Rdy\);
  while r[1]=0 
-   r[1]:=\(Rdy\);
+ \{ r[1]:=\(Rdy\); \}
  \(Flag\):=1;\end{alltt}
 \end{tabular}
+}
 \caption{Sender/Receiver template with a triangular race.}
 \label{fig:send-receive}
 \end{figure}
@@ -144,10 +151,12 @@ Let us consider the set of TSO runs in which two threads $t$ and $u$ run {\tt Re
 
 \paragraph{Triangular race.}
 This program does have a triangular race depicted by the following memory trace
+{\small
 \begin{eqnarray*}
 & \locwritex t {Rdy} 1 \cdot\ \alireadx t {Buf} 0\cdot\ \locwritex u {Buf} d \cdot\ \remwritex u {Buf} d\\
 &\cdot\ \alireadx u {Rdy} 0\cdot\ \remwritex t {Rdy} 1
 \end{eqnarray*}
+}
 The first three actions, the local write to $Rdy$ and read of $Buf$ by $t$ followed by a write to $Buf$ by $u$ gives the triangular race.
 The remaining part of the execution shows how the race can be extended into a non SC-like run. 
 
@@ -156,18 +165,22 @@ Following the discussion about the general case regarding triangular races, one 
 However, that would make the rest of the code behave incorrectly since a non-zero value for $Buf$ means a valid message which need not be equal to what $u$ is about to write, $d$.
 
 Let us instead consider the following abstraction for the statement {\tt $\aliregx 2$:=$Buf$}:
+{\small
 \begin{eqnarray*}
 &&\aliif\ {\alihavocval}\\
 &&\alithen\ \aliatomicx {\aliassumex {Buf=0};\ \aliregx 2:=Buf;}\\
 &&\alielse\ \aliatomicx {\aliassumex {Buf\neq0};\ \aliregx 2:=\alihavocval;}
 \end{eqnarray*}
+}
 This replacement is an instance of {\sc\small CtrlNondet} and thus leads to a sound abstraction.
 We claim that in the new abstract program $P'$ the write to $Rdy$ by {\tt Recv} is atomic.
 %In order to prove this claim we have to show that the memory trace of any run of $P'$ has an equivalent SC-execution.
 Let $\alisequencex r$ be a run in $\alirunsx {tso} {P'}$ whose memory trace is of the form
+{\small
 \[
 \alpha\cdot\ \locwritex t {Rdy} 1\cdot\ \gamma\cdot\ \remwritex t {Rdy} 1\cdot\ \beta
 \]
+}
 where $\alpha$, $\tau$ and $\beta$ are sequences of memory actions.
 We have to show that there exists another run $\alisequencex {r'}$ of $P'$ computationally equal to $\alisequencex r$  in which the write to $Rdy$ is atomic.
 %\[
@@ -189,20 +202,22 @@ Thus, in case $\gamma$ contains read(s) of $Flag$ they can all move to right of 
 Since a local write action is always a right mover, we are left with the read of $Buf$ by $t$.
 If the remote write action $\remwritex u {Buf} d$ is not in $\gamma$, then we are done.
 Assume that \remwritex u {Buf} d happens after some prefix $\gamma_p$ of $\gamma$, i.e.
+{\small
 \[
 \alpha\cdot\ \locwritex t {Rdy} 1\cdot\ \gamma_p\cdot\ \remwritex u {Buf} d\cdot\ \gamma_q\cdot\ \remwritex t {Rdy} 1\cdot\ \beta
 \]
+}
 If the read of $Buf$ by $t$ happens in $\gamma_q$, we are done.
 So assume that the read of $Buf$ happens in $\gamma_p$.
 Since it happens before the remote write action, the state at which the abstract read statement occurs must have $Buf=0$.
 According to the abstraction, this means that the {\tt then} branch must have been taken, which sets $\aliregx 2$ to 0 (by reading the contents of $Buf$).
-If the abstracted statement moves is executed after $\remwritex u {Buf} d$, then because $Buf\neq 0$ holds after the remote write, the {\tt else} branch will be taken instead.
+If the abstracted statement is executed after $\remwritex u {Buf} d$, then because $Buf\neq 0$ holds after the remote write, the {\tt else} branch will be taken.
 That in turn implies that $\aliregx 2$ can be assigned any value, including 0. 
 So, the sequence
 \[
 \alpha\ \cdot\ \gamma_p'\cdot\ \remwritex u {Buf} d\cdot\ \gamma_q'\cdot\ \locwritex t {Rdy} 1\cdot\ \remwritex t {Rdy} 1\cdot\ \gamma_2\ \cdot\ \beta
 \]
-where $\gamma_p'$ does not contain any action by $t$ is also a memory trace of $P'$.
+where $\gamma_p'$ does not contain any action by $t$ is also a memory trace of a run of $P'$ computationally equal to $\alisequencex r$.
 Since $\gamma$ was taken to be arbitrary, we conclude that the write to $Rdy$ by $t$ is atomic.
 
 \paragraph{Execution context.}

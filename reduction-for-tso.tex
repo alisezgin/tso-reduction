@@ -17,8 +17,7 @@ Similarly, $s$ is {\em right-mover in $\aliequivgeneric$} if for any $\alisequen
 
 Intuitively, $s$ is left mover (resp. right mover) if reordering $s$ before (resp. after) any other statement that is concurrent with $s$ does not change the behavior (all runs belonging to the same equivalence have the same behavior).
 In the classic definition of reduction, the equivalence relation requires that the two sequences be permutations of each other and that the end states are identical, which corresponds to $\tsoequiv$ in the TSO context.
-The reason for the added generality will become clear once we generalize reduction with abstraction.
-
+%The reason for the added generality will become clear once we generalize reduction with abstraction.
 Our first result about movers follows immediately from definitions.
 \begin{lemma}
 Let $P$ be a program.
@@ -49,7 +48,7 @@ Then the following is a particular instance of the previous result.
 \begin{corollary}
 All singular TSO runs of $P[T]$ are SC-like if for each method $m_i$, either all of its local actions are right-movers in $\tsoequiv$ or all of its remote write actions are left-movers in $\tsoequiv$. 
 \end{corollary}
-We can specialize even further, obtaining the following, which is also implied by triangular-race freedom of \cite{Owe2009}.
+We can specialize even further, obtaining the following, which is also implied by triangular-race freedom of \cite{Owe2010}.
 \begin{corollary}
 Let $P$ be such that each $m_i$ either only updates the shared memory (no read actions) or only reads shared memory (no write actions).
 Then all singular TSO runs of $P[T]$ are SC-like.
@@ -57,8 +56,8 @@ Then all singular TSO runs of $P[T]$ are SC-like.
 
 %Now we will investigate the impact of placing fence statements in restricting the non-SC-like behaviors of programs.
 \paragraph{Write atomicity.}
-We will call a statement $s$ in $P$ {\em atomic} if all transitions whose source is $s$ are executed without interference. 
-In particular, a memory update statement ($s=\alimemx i\mathtt{:=} e$) is atomic if the two transitions caused by $s$ are adjacent; i.e. the local write action due to $s$ is synchronous.
+We will call a statement $s$ in $P$ {\em atomic} if for every run of $P$ there is an $\tsoequiv$-equivalent run such that actions due to each execution of $s$ are adjacent. 
+In particular, a memory update statement ($s=\alimemx i\mathtt{:=} e$) is atomic if in an $\tsoequiv$-equivalent run the two transitions caused by $s$ are adjacent; i.e. the local write actions due to $s$ are synchronous.
 The reason we introduce write atomicity should be clear: By Lem.~\ref{lem:synchronous-write}, if one can prove that for any TSO run of program $P$ there exists an equivalent run in which $s$ is atomic, then we can safely transform $s$ to $\aliatomicx {s\mathtt{;} \alifence}$.
 This substitution decreases the number of possible interleavings, which in turn simplifies the analysis of the program.
 Indeed, the latter is a step towards the ultimate goal of analyzing the whole program under SC semantics.

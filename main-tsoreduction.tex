@@ -76,10 +76,7 @@
 \maketitle
 
 \begin{abstract}
-%A prominent way of analyzing programs written for relaxed memory models is to check whether it is sound, for the particular program under analysis, to assume sequential consistency (SC) which is taken to be the tractability threshold for concurrent reasoning.
-%The approach is based on establishing a {\em data race freedom} result, which essentially identifies for a given memory model the class of programs which cannot manifest non-SC behaviors.
 Analysis of programs running on total store ordering (TSO) memory model can be restricted to sequential consistency (SC) analysis, thereby porting the original problem to a well-established and understood domain, if the program does not have triangular races.
-%The total store ordering (TSO) memory model in particular has been fully characterized: a program will be SC-like, i.e. without any non-SC behaviors, if and only if it is triangular race free.
 Unfortunately, checking whether a program, even when constrained to finite data domains, has a triangular race belongs to {\sc PSpace}.
 Furthermore, it is unclear what one is to do except for reasoning in full TSO semantics if the program fails to avoid those races.
 
@@ -87,7 +84,7 @@ In this paper, we tackle the problem of TSO program analysis, possibly in the pr
 We begin by generalizing Lipton's reduction theory, hitherto limited to SC, for TSO programs.
 Based on an interleaving semantics for TSO in which every write is split into a pair of actions, a write into buffer and its flush from the buffer, reduction arguments lead to proofs of write atomicity. 
 In order to prove that a TSO program is race-free, it is sufficient to prove all of its writes atomic.
-We state results on sufficient conditions for ensuring write atomicity, compositionality, and prove completeness of reduction theory under TSO semantics.
+We state results on sufficient conditions for ensuring write atomicity, compositionality, and prove completeness of reduction theory for write atomicity checking.
 
 For programs that do contain triangular races, we introduce abstraction: $P'$ abstracts $P$ if every behavior of $P$ is also a behavior of $P'$.
 In essence, $P'$ avoids races by non-deterministically guessing values read or written.
@@ -117,9 +114,9 @@ The approach is based on establishing a {\em data race freedom} result, which es
 
 Total store ordering (TSO) is a well-known relaxed memory model variants of which are employed in commercial processors, most notably x86 family of processors~\cite{SSO+2010}.
 Both TSO and SC give the illusion that the thread-local program order is respected for memory accesses.
-Unlike SC where updates are assumed to take effect instantaneously over all threads, in TSO updates are observably split into two: a locally visible update and an instantaneous remote update not necessarily simultaneous with the local update.
+Unlike SC where updates are assumed to take effect instantaneously over all threads, updates in TSO are observably split into two: a locally visible update and an instantaneous remote update not necessarily simultaneous with the local update.
 This split is due to a thread local store buffer which writes have to go through before becoming visible by other threads.
-Operational models of TSO formalize this explicitly: local updates are inserted into the thread local queue; entries are removed from these queues asynchronously and non-deterministically with each removal updating a single global shared memory location. 
+Operational models of TSO formalize this explicitly: local updates are inserted into the thread local queue; entries are removed from these queues asynchronously and non-deterministically with each removal updating a globally shared memory location. 
 
 It was shown in \cite{Owe2010} that a TSO program does not have non-SC behaviors iff it does not have a triangular race, called triangular race freedom (TRF).
 A triangular race is one in which one thread updates a location, then reads another location which is concurrently updated by another thread.
@@ -134,34 +131,35 @@ Their method based on SC reachability is complete, but it suffers from high comp
 We mentioned that one strives to convert TSO programs to that of SC programs because the latter is much better studied.
 One well-known approach is Lipton's reduction theory~\cite{Lip1975}.
 It limits program analysis to a set of representative runs which capture the behavior of the whole program, possibly relative to a desired property.
-It is based on removing superficial concurrency by determining those sequentially composed actions which do not add new behavior when they interfere with their execution environment, the process known as determining {\em mover types} of statements.
-Even though the only essential requirement for the application of reduction is interleaving semantics, it has always been limited to SC program analysis.
+It is based on removing superficial concurrency by determining those sequentially composed actions which do not add new behavior when their execution is interleaved with the environment in which they run.
+Even though the only essential requirement for the application of reduction is interleaving semantics, it has always been limited to SC program analysis (e.g.~\cite{EQT2009,KPH2010,RD1997}).
 Its application to relaxed memory models was questionable because it was not clear how to argue the mover types of statements when their effects were non-atomic.
 
 In this paper, we apply reduction theory to TSO programs.
 Our first contribution is a deeper understanding of TSO programs.
-Following earlier work mentioned above, we show how reduction theory based arguments can be used to check TRF.
+Building on earlier work~\cite{BDM2013,Owe2010}, we show how reduction theory based arguments can be used to check TRF.
 We view the run of a TSO program as a sequence in which each memory write is translated into two actions: a local write and a remote write.
 Instead of having an all or nothing approach, we use reduction to check whether separating the local and remote writes arbitrarily introduces any new behavior as opposed to executing them consecutively.
 This notion of write atomicity is the crux of our analysis:
 A program is TRF if all of its write statements are atomic.
 Reduction arguments yield surprisingly insightful results.
-For instance, we show that a write statement is atomic because its remote write is left-mover, then putting a fence immediately {\em before} the statement guarantees the atomicity of that write in all non-interfering execution contexts.
+For instance, we show that if a write statement is atomic because its remote write is left-mover, then putting a fence immediately {\em before} the statement guarantees the atomicity of that write in all non-interfering execution contexts.
 We also prove the completeness of reduction in proving write atomicity, hence TRF.
 
 Our second contribution is the simplification of the analysis of TSO programs which do contain triangular races, a domain to which so far only full fledged TSO analysis has been applied. 
 Our main observation is that replacing a read of a memory location into a register with a non-deterministic assignment to that register has the potential of removing triangular races.
 Such replacements are instances of a more general approach known as abstraction, previously used in~\cite{EQT2009} for SC program analysis.
 We formalize the notion of abstraction for TSO programs and describe how abstraction along with reduction can be used to turn non-TRF programs into TRF programs.
-Following the description of the methodology, we demonstrate its use on a program with triangular race.
+We demonstrate the use of abstraction on a program with triangular race.
 
 Our third and final contribution is the implementation of these theoretical results.
-Orthogonal to what we have done so far, we introduce a program transformation algorithm which converts a TSO program (with or without triangular races) into an equivalent SC program.
+Orthogonal to what we have done up to that point, we introduce a program transformation algorithm which converts a TSO program (with or without triangular races) into an equivalent SC program.
 The construction converts each execution thread of the TSO program into a pair of tightly coupled execution threads.
 Intuitively, whatever the thread in the original TSO program does is simulated by this pair. 
 All local actions are simulated by one, all remote write actions are simulated by the other.
 Once the transformed program is obtained, we can implement all our previous results related to write atomicity and abstraction, which we do by mechanically verifying write atomicity of double checked initialization.
-We also briefly discuss the applicability of reduction to other relaxed memory models, which as we have already hinted, is not fundamentally impossible as long as the relaxed memory model admits an interleaving operational semantics.
+In the remainder of this section, we informally summarize the highlights of the paper, mention related work and give the outline of the paper.
+%We also briefly discuss the applicability of reduction to other relaxed memory models, which as we have already hinted, is not fundamentally impossible as long as the relaxed memory model admits an interleaving operational semantics.
  
 \subsection{Overview}
 \label{subsec:overview}
@@ -171,48 +169,50 @@ We start by explaining how one reasons about TSO programs using reduction.
 
 \paragraph{Reduction for TSO.}
 Consider a code snippet from a program with three threads:
+{\small
 \begin{eqnarray*} 
  C_{t1} &  C_{u1} &  C_{v1}\\
 X \mathtt{:= 1;} &  Y\mathtt{:= 2;} &  p\mathtt{:=}X\mathtt{;}\\
 & r\mathtt{:= }X\mathtt{;} &  q\mathtt{:=}Y\mathtt{;}\\
 C_{t2} & C_{u2} & C_{v2}
 \end{eqnarray*}
+}
 where $C_*$ represent code segments which refer to neither $X$ nor $Y$.
 In the specified segment, the thread on the left, $t$, writes 1 into shared variable $X$.
 The thread in the middle, $u$, writes 2 to shared variable $Y$ and then reads the value of $X$ into local variable $r$.
 Finally, the thread on the right, $v$, reads the values of $X$ and $Y$ into local variables $p$ and $q$.
 
-It is possible to observe $r=q=0$ and $p=1$ under TSO semantics.
+It is possible to observe $r=q=0$ and $p=1$ under TSO semantics which constitutes a non-SC behavior.
 For instance, the execution segment
 \[
 \locwritex u Y 2\cdot \alpha\cdot \locwritex t X 1\cdot \beta\cdot \remwritex t X 1\cdot \gamma\cdot \remwritex u Y 2 
 \]
-where $\locwritex t X 1$ represents the insertion of the write of $X$ by $t$ into its store buffer and $\remwritex t X 1$ represents the flushing of the associated entry from the buffer and $\alpha,\beta,\gamma$ are sequences of actions.
+where $\locwritex u Y 2$ represents the insertion of the write of $Y$ by $u$ into its store buffer and $\remwritex t X 1$ represents the flushing of the associated entry from the buffer and $\alpha,\beta,\gamma$ are sequences of actions.
 The read values are possible if $u$ executes its read either in $\alpha$ or $\beta$ and $v$ executes its reads in $\gamma$.
 
-In terms of reduction theory, we can equivalently claim the non-SC of the given execution by arguing that it is impossible to {\em move} the local write by $u$ next to its remote write without changing the values read by threads $u$ and $v$.
-In the sample execution given above, since the read of $X$ by $u$ is not in $\gamma$ and it cannot be reordered with $\remwritex t X 1$ without changing its observed value, the local write $\locwritex u Y 2$ cannot move to the right of $\remwritex t X 1$ either.
-On the other hand, the remote write $\remwritex u Y 2$ cannot move to the left of every action in $\gamma$ since it  contains the read of $Y$ executed by $v$. 
-A TSO execution has an equivalent SC execution only when all local and remote write actions can be put together without changing the read values, which means that the above sequence is indeed non-SC.
+In terms of reduction theory, we can equivalently claim that the given execution is non-SC by arguing that it is impossible to {\em move} the local write by $u$ next to its remote write without changing the values read by threads $u$ and $v$.
+In the sample execution given above, since the read of $X$ by $u$ is not in $\gamma$ and it cannot be reordered with $\remwritex t X 1$ without changing its observed value, the local write $\locwritex u Y 2$ cannot move to the right of $\remwritex t X 1$ either without reodering local actions belonging to the same thread which is not allowed under TSO.
+On the other hand, the remote write $\remwritex u Y 2$ cannot move to the left of every action in $\gamma$ since it contains the read of $Y$ executed by $v$ whose observed value of 0 will not be consistent with TSO semantics when it is preceded by a memory update of $Y$ with 2. 
+Since a TSO execution has an equivalent SC execution only when all local and remote write actions can be put together without changing the read values, the above sequence is indeed non-SC.
 
 \paragraph{Write atomicity.}
-The sample program has non-SC behavior, but even before attempting to turn it into a TRF program, we observe that the local and remote write actions due to the write by $t$ can always be put together if for the moment we ignore the presence of $C_{t1}$ and $C_{t2}$; i.e. assume that $t$ executes only the write to $X$.
+The sample program has non-SC behavior, but even before attempting to turn it into a TRF program, we observe that the local and remote write actions due to the write by $t$ can always be put together, if for the moment we ignore the presence of $C_{t1}$ and $C_{t2}$; i.e. if we assume that $t$ executes only the write to $X$.
 This is because a local write action, which only updates the thread local state (changing buffer contents), moves to the right of every concurrent action without changing the overall behavior of the execution.
-As we show, one can place a fence statement immediately after an atomic write statement without restricting the overall behavior of the program.
+The nice property of write atomicity is that, as we show, one can place a fence statement immediately after an atomic write statement, simplifying program analysis under TSO semantics, without restricting the overall behavior of the program.
 
 \paragraph{Removing triangular race.}
 For the sake of simplicity, assume that the value of $q$ is not subsequently used by $v$; i.e. $q$ is not read in $C_{v2}$.
-Then, we can obtain a new program by replacing the read of $Y$ with $q\mathtt{:=}\alihavocval$, which intuitively can assigns any value to $q$.
-The behaviors of this new program is a proper superset of the original program because of additional non-determinism. 
-The fact that $Y$ is not read by $v$ in the new program immediately allows to prove that the previously non-atomic write to $Y$ now is atomic. 
-However, unlike the atomicity argument for the write of $X$ by $t$, the write to $Y$ is atomic because we can move $\remwritex u Y 2$ to the left of $\remwritex t X 1$ because $\gamma$ does not contain the conflicting read of $Y$. 
-Here again we assume that $C_{v1}$ and $C_{v2}$ do not exist which brings us to our next observation.
+Then, we can obtain a new program by replacing the read of $Y$ with $q\mathtt{:=}\alihavocval$, which intuitively can assign any value to $q$.
+The behaviors of this new program subsumes the behaviors of the original program because of additional non-determinism. 
+The fact that $Y$ is not read by $v$ in the new program immediately allows us to prove that the previously non-atomic write to $Y$ now is atomic. 
+However, unlike the atomicity argument for the write of $X$ by $t$, the write to $Y$ is atomic because we can move $\remwritex u Y 2$ to the left of $\remwritex t X 1$, in turn because $\gamma$ does not contain the conflicting read of $Y$. 
+Here again we assumed that $C_{v1}$ and $C_{v2}$ do not exist which brings us to our next observation.
 
 \paragraph{Compositionality.}
 At this point we know that in the abstracted program, the write by $t$ is atomic because its local action is a right-mover (abstraction does not affect its atomicity argument), and the write by $u$ is atomic because its remote action is a left-mover.
-We will show that the write to $X$ remains atomic if the first action in $C_{t2}$ is a fence statement.
+One of our results implies the write to $X$ remains atomic if the first action in $C_{t2}$ is a fence statement.
 Dually, the write to $Y$ remains atomic if the last action in $C_{v1}$ is a fence statement.
-Analyzing write atomicity based on reduction allows us to make these distinctions in fence placements.
+Thus, analyzing write atomicity based on reduction allows us to make these distinctions in finding places for requiring fence statements.
 
 \paragraph{Program transformation and mechanical verification.}
 Transforming TSO programs into equivalent SC programs usually entails embedding an array per thread, representing the local store buffer.
@@ -220,50 +220,53 @@ Then, each write is inserted into this array and a non-deterministic loop, repre
 This encoding for us is not suitable because we want to explicitly check the mover types of local and remote writes. 
 To that end, we make use of the fact that there is a bijection between buffer insertions and removals that respect thread local program order.
 
-In our sample code, the write to $X$ by $t$ will be transformed into two writes, one by $t$ to a new local copy of $X$ and one by $t'$ (the {\em dual} thread of $t$) to $X$.
+When we apply our transformation to the sample code above, the write to $X$ by $t$ will be transformed into two writes, one by $t$ to a new local copy of $X$ and one by $t'$ (the {\em dual} thread of $t$) to $X$.
 An important requirement is that the local write by $t$ always precede the remote write by $t'$, and this we achieve by using a semaphore like structure per write statement, which is incremented by $t$ and decremented by $t'$. 
 
 Once an equivalent SC program is obtained, any SC analysis tool can be used to reason about the program.
-Here we are primarily interested in the mover types of local and remote write actions and propose one particular way of doing it.
+In this paper, we are primarily interested in the mover types of local and remote write actions and propose one particular way of doing it.
 
-\paragraph{Contributions.} 
 To summarize, in this paper we:
 \begin{itemize}
 \item develop a formal reasoning framework for TSO programs based on reduction,
 \item obtain numerous theoretical results adding to the understanding of what separates TSO programs with triangular races from those without,
-\item introduce abstraction for TSO programs in order to obtain TRF programs from those that are not,
+\item introduce abstraction for TSO programs in order to obtain TRF programs from those that are not TRF,
 \item present a novel transformation from TSO programs to equivalent SC programs,
 \item propose a way to mechanically verify TRF.
 \end{itemize}
 
 \paragraph{Related work.}
-Program verification under relaxed memory models has been a field of intense study. 
-In this discussion of related work, we focus only on TSO and discuss related work on model checking, fence insertion, reachability analysis for computational models, testing and monitoring only when the correctness criteria or underlying ideas are relevant to our work. 
-Our technique is distinguished from this work fundamentally in that our proofs are valid for an arbitrary number of threads, memory addresses, or arbitrary (not necessarily finite domain) program variables and do not bound the length of the store buffer. 
-Furthermore, our proofs cover the entire set of executions of a program and are not limited to a subset of interleavings defined, e.g., by bounding the number of context switches. 
-
-We take as our formal basis the abstract machine memory model described in the operational semantics of Owens et al.~\cite{OSS2009}. 
+Program analysis under relaxed memory models has been a field of intense study, e.g. formalization of memory models~\cite{BA2008,BOS2011,HMS+2012,SSO+2010}, program logics for relaxed memory models~\cite{BDG2013,FFS2010,Rid2010,VN2013} or verification techniques~\cite{AKN+2013,BDM2013,BM2008,DMV+2013,ND2013}. 
+In this discussion of related work, we focus only on research about TSO program analysis. % and discuss related work on model checking, fence insertion, reachability analysis for computational models, testing and monitoring only when the correctness criteria or underlying ideas are relevant to our work. 
+%Our technique is distinguished from this work fundamentally in that our proofs are valid for an arbitrary number of threads, memory addresses, or arbitrary (not necessarily finite domain) program variables and do not bound the length of the store buffer. 
+%Furthermore, our proofs cover the entire set of executions of a program and are not limited to a subset of interleavings defined, e.g., by bounding the number of context switches. 
+Our formal basis is derived from the abstract machine memory model described in the operational semantics of Owens et al.~\cite{OSS2009}. 
 Our work provides a static, mechanical checking method for and generalizes triangular race freedom (TRF) introduced by Owens~\cite{Owe2010}. 
-TRF and the notion of TSO-robustness by Bouajjani et al.~\cite{BDM2013} are very closely related. 
-Since our mechanical verification is SMT-based, it is not restricted to finite state programs or a finite number of threads but involves potentially undecidable SMT queries. 
+Unlike the latter, we propose a methodology to (mechanically) check TRF.
+TRF and the notion of TSO-robustness by Bouajjani et al.~\cite{BDM2013} are closely related. 
+Since our mechanical verification is SMT-based, it is not restricted, as is \cite{BDM2013} restricted, to finite state programs or a finite number of threads but involves potentially undecidable SMT queries. 
 
 The use of code-to-code translation as a means for converting a verification task on a program running on a relaxed memory model to another verification task expressed on a sequentially consistent program is common in the literature (e.g., \cite{FBP2011,BDM2013,DMV+2013,AKN+2013}. 
 We do not consider code-to-code translation to be a verification technique in and of itself, rather, a mechanism for realizing a certain reduction from one problem to another. 
 In terms of the crux of the reduction, techniques differ widely. 
-Our code-to-code translation is also similar -- its value is in enabling us to use abstraction and reduction to prove triangular race freedom statically. 
-Our translation differs from others in that it is not limited to a given, fixed number of threads. 
+Our code-to-code translation, by explicitly representing buffer flushes, enables us to use abstraction and reduction to prove triangular race freedom statically. 
 
-\cite{Rid2010} introduces a proof system for reasoning about x86 assembly programs running against the weak x86-TSO memory model. 
-This Rely-Guarantee proof system enables the system such that one processor can refer to other's local state. 
-Mechanical proofs are handled by Hol in the backend. Our work provides more automation by providing pre-defined proof rules that facilitate the verification of TRF on the original or abstracted program. 
+Automatic fence insertion into TSO programs to guarantee the absence of non-SC behaviors has enjoyed much interest (e.g.~\cite{AAC+2012,AAC+2013,BAM2007,FLM2003,LNP+2012,MVY2014,VN2011}).
+Even though we present several results about fence placement, we do not engage in an in-depth analysis which we leave as future work.
+%Our translation differs from others in that it is not limited to a given, fixed number of threads. 
 
-\cite{JLP+2014} presents a proof methodology to verify the correctness of compiler translations from a Java-like intermediate representation to a low-level structured register transfer language (RTL) representation under the TSO model. 
-The refinement method used makes use of some notions (e.g., atomicity, reduction) common with our work. 
-Their technique assumes that non-interference between code segments has been verified separately and verifies code transformations under this assumption. 
-Our work centers on verifying the desired non-interference under TSO. 
+%\cite{Rid2010} introduces a proof system for reasoning about x86 assembly programs running against the weak x86-TSO memory model. 
+%This Rely-Guarantee proof system enables the system such that one processor can refer to other's local state. 
+%Mechanical proofs are handled by Hol in the backend. 
+%Our work provides more automation by providing pre-defined proof rules that facilitate the verification of TRF on the original or abstracted program. 
+
+%\cite{JLP+2014} presents a proof methodology to verify the correctness of compiler translations from a Java-like intermediate representation to a low-level structured register transfer language (RTL) representation under the TSO model. 
+%The refinement method used makes use of some notions (e.g., atomicity, reduction) common with our work. 
+%Their technique assumes that non-interference between code segments has been verified separately and verifies code transformations under this assumption. 
+%Our work centers on verifying the desired non-interference under TSO. 
 
 \paragraph{Roadmap.}
-In Sec.~\ref{sec:formal-framework}, we set the formal framework.
+In Sec.~\ref{sec:formal-framework}, we develop the formal framework.
 In Sec.~\ref{sec:reduction-for-tso}, we introduce reduction theory for TSO programs.
 In Sec.~\ref{sec:abstracting-tso-programs}, we formalize the notion of abstraction for TSO programs and illustrate the methodology on a handshake based send/receive implementation.
 In Sec.~\ref{sec:mechanical-verification}, we present our transformation technique converting TSO programs into equivalent SC programs.
@@ -352,6 +355,7 @@ What makes a memory model relaxed is
 
 
 \section{Conclusion}
+\label{sec:conclusion}
 In this paper, we show how TSO programs can be analyzed using reduction theory.
 We argue that an explicit reasoning based on the local/remote dichotomy of write actions that exist in TSO semantics allows us to investigate the problematic from a different perspective. 
 Besides adopting well-established SC analysis concepts such as atomicity of statements to TSO programs, we are also able to distinguish between different types of atomicity (right-mover local write vs. left-mover remote write) which has consequences for fence placement to ensure proper usage.
@@ -360,14 +364,14 @@ We also develop a new transformation from TSO programs to equivalent SC programs
 
 We do not think that we have comprehensively listed all interesting results for TSO when reduction is the main intellectual tool.
 We believe that many specific execution contexts will benefit from a detailed analysis of mover types of local and remote actions.
-These analyses may lead to less cost in synchronization, not only less number of fence statements but also correct use of optimistic and racy reads which have been very tricky to reason about. 
-This is a line of work which we are planning to work on.
+These analyses may lead to less cost in synchronization, not only because there will be less number of fence statements but also because of increased confidence in the correct use of optimistic and racy reads which have been very tricky to reason about. 
+This is a line of work which we are planning to do further research.
 
 Our approach admittedly, at least at the theoretical level, deals with TSO semantics, not to prove the property one might be interested in, but rather to check whether that property can be verified under SC semantics.
 Be that it may, it is still interesting and potentially quite rewarding if one can specify sufficient conditions the satisfaction of which guarantees the mover type of a write under SC semantics carries over to TSO semantics.
-In other words, when can we claim that a remote write is a left-mover when its corresponding statement under SC semantics is shown to be left-mover?
+In other words, it is interesting to determine when we can claim that a remote write is a left-mover when its corresponding statement under SC semantics is shown to be left-mover.
 
-Finally, and definitely the most important extension to our work is to investigate reduction for other relaxed memory models.
+Finally, and arguably the most important extension to our work, is to investigate the applicability of reduction for other relaxed memory models.
 As we said before, in principle reduction theory can be applied for any memory model as long as it can be modelled using interleaving semantics.
 Other relaxed memory models would not be as easy to formulate for reduction as TSO, mainly because not only writes are even less atomic (each thread may observe an arbitrary interleaving of other threads' remote writes), but also program order which both TSO and SC respect is relaxed.
 All of this withstanding, reduction theory might prove to be an elegant tool to capture data race freedom theorems for various relaxed memory models.

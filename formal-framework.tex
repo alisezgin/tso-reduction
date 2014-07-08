@@ -4,6 +4,7 @@
 In this section, we describe the notation used in the rest of the paper, formalize TSO and SC semantics, and present a simple programming language.
 
 \begin{figure}
+{\small
 \begin{tabular}{lcll}
 action ($a$,$b$) & ::= & \aliwritex t x v & (direct write: shared memory\\
 & & & update of location $x$\\ 
@@ -17,6 +18,7 @@ action ($a$,$b$) & ::= & \aliwritex t x v & (direct write: shared memory\\
 %& $|$ & \alilockx t & (the beginning of a \\
 %& $|$ & \aliunlockx t
 \end{tabular}
+}
 \caption{The alphabet $\tsoalph$ of memory actions in TSO.}
 \label{fig:grammar-tso}
 \end{figure}
@@ -80,7 +82,7 @@ Each TSO-execution $\mathbf{e}$ induces a partial order $\alipotsox {\mathbf{e}}
 \item neither $a$ nor $b$ is a remote write action. 
 \item $a$ is the $i^{th}$ local write by $t$ and $b$ is the $i^{th}$ remote write by $t$.
 \end{itemize}
-
+We will make use of $\alipotso$ in defining equivalence relations over TSO runs.
 \paragraph{SC-executions.}
 {\em SC actions}, subset of $\tsoalph$, include only the first two kinds of actions; i.e., $\{\aliwritex t x v\}\cup\{\alireadx t x v\}$.
 %The actions of the form $\aliwritex t x v$ are (direct) {\em write} actions.
@@ -107,6 +109,7 @@ SC-executions have to satisfy: if $\mathbf{s}[i]=\alireadx t x v$, then either i
 
 \paragraph{Correspondence between TSO and SC.}
 We define a mapping $\aliconvert$ from the actions of TSO to those of SC as follows.
+{\small
 \[
 \aliconvertx a \stackrel{def}{=} 
  \begin{cases}
@@ -116,6 +119,7 @@ We define a mapping $\aliconvert$ from the actions of TSO to those of SC as foll
   \varepsilon & \text{, if } a=\alibarrierx t
  \end{cases}
 \]
+}
 For a TSO-execution $\mathbf{e}$, let $\aliconvertx {\mathbf{e}}$ denote the sequence obtained by the point-wise extension of $\aliconvert$.
 
 Let $\mathbf{e}$ be a complete TSO-execution.
@@ -263,6 +267,7 @@ Thus, if an execution is equivalent to a buffer-free execution, then its behavio
 
 
 \begin{figure}
+{\small
 \begin{tabular}{lcl}
 %$P$ & ::= & $M,P \mid \varepsilon$\\
 $M$ ($m$,$m',\ldots$) & ::= & $N()\ \{ C \}$\\
@@ -281,6 +286,7 @@ $I$ & ::= & $\langle Integer\rangle$
 %$T$ & ::= & $\langle Bool\rangle \mid \langle Int\rangle$\\
 %$L$ & ::= & $\langle Label\rangle$\\
 \end{tabular}
+}
 \label{fig:program-grammar}
 \caption{A simple programming language.}
 \end{figure}
@@ -299,9 +305,9 @@ We use a simple programming language, whose grammar for method definitions is gi
 A method $M$ consists of a {\em name} ($N$) and a {\em code} ($C$).
 A name is simply a string.
 A code is a, possibly empty, sequence of statements ($S$) sequentially composed ({\tt ;}).
-Statements can be used to read from memory ($r := \alimemx e$), update the contents of a memory location ($\alimemx e := e'$), empty the store buffer (\alifence), assign a value to a register ($r := e$).
-The model control flow, we have the usual branching ($\aliifelsex e {e_1} {e_2}$) and looping ($\aliwhilex e$) statements.
-Additionally, we will also use an explicit blocking statement ($\aliassume\ e$), which blocks as long as $e$ evaluates to $\alifalse$.
+Statements read from memory ($r := \alimemx e$), update the contents of a memory location ($\alimemx e := e'$), empty the store buffer (\alifence), assign a value to a register ($r := e$).
+To model control flow, we have the usual branching ($\aliifelsex e {e_1} {e_2}$) and looping ($\aliwhilex e$) statements.
+Additionally, we also use an explicit blocking statement ($\aliassume\ e$), which blocks as long as $e$ evaluates to $\alifalse$.
 Finally, the statement ($\aliassert\ e$) is used to claim that $e$ should hold whenever this statement can execute.
 The nonterminal $R$ refers to {\em registers} and are used to model thread local address space.
 The nonterminal $E$ refers to well-formed {\em expressions} that can be written using registers, mathematical and logical operators, and the return values of procedures.
@@ -309,7 +315,7 @@ The shared data space is mapped by $\alimemx e$, where $e$ is an expression whic
 As a syntactic sugar, we will use words in italic font with first letters capitalized to denote a location in shared memory, e.g. $Obj$ will stand for some $\alimemx i$.
 
 A {\em program} is identified with a set of methods.
-We assume that each statement of a program is uniquely identified, captured by a labelling function $\alilabel: \aliprogstmtx P \rightarrow L$, where $\aliprogstmtx P$ denotes the set of statements used in program $P$ and $L$ is the (universal) {\em label} set.
+Each statement of a program $P$ is uniquely identified, captured by a labelling function $\alilabel: \aliprogstmtx P \rightarrow L$, where $\aliprogstmtx P$ denotes the set of statements in $P$ and $L$ is the (universal) {\em label} set.
 
 \paragraph{Operational Semantics.}
 \input{operational-semantics}
@@ -329,7 +335,7 @@ Intuitively, $\alicontrol$ encodes the execution context for each thread in the 
 If $\alicontrolx t=\alisequencex {l}$, then $\alisequencex {l} \langle 1,\alilenx{\alisequencex {l}}-1\rangle$ keeps the nesting history and $\alisequencex {l}[\alilenx{\alisequencex {l}}]$ is the label of the next statement to be executed by thread $t$.
 The {\em valuation} $\alivaluation:\mathbb{N}\cup (T\times R) \rightarrow \mathbb{N}$ maps each memory location and register of each thread to its content, assumed to be a non-negative integer.
 Intuitively, $\alivaluation$ holds the storage state: the contents of each register of each thread and the contents of the (single) global memory.
-The contents of a memory location $i$, $\alimemx i$, is accessed by $\alivaluationx {i}$, and the content of some register $r$ used by a thread $t$ is accessed by $\alivaluationx {t,r}$.
+The contents of a memory location $i$, $\alimemx i$, is mapped by $\alivaluationx {i}$, and the content of some register $r$ used by a thread $t$ is accessed by $\alivaluationx {t,r}$.
 The {\em buffer view} $\alibuffer:T \rightarrow (\mathbb{N}\times\mathbb{N})^*$ maps each thread to a sequence over pairs of natural numbers.
 Intuitively, $\alibufferx t=(a_1,d_1)\ldots(a_k,d_k)$ means that the store buffer of thread $t$ contains $k$ buffered writes, the oldest being to location $a_1$ of value $d_1$ and the newest being to location $a_k$ of value $d_k$.
 We use $a\in\alibufferx t$ to denote the fact that there is $j\in[1,k]$ with $a_j=a$.
@@ -343,16 +349,18 @@ We drop $q$ when the state is understood from the context.
 The distinguished state $q_{init}$ is the {\em initial state}, such that $q_{init}.\alicontrol=\varepsilon$, $q_{init}.\alivaluation$ maps everything to 0, $q_{init}.\alibuffer=\varepsilon$, and $q_{init}.\aliexecmode=-1$.
 
 The transition relation $\rightarrow\subseteq Q\times Tr\times Q$ of $\aliltsx P$ is given in Fig.~\ref{fig:operational-semantics}.
-The label of a transition is written as $\tau=R,t:s$; it is called an $R$ transition, {\em executed by} thread $t$, and the {\em execution of} statement $s$ when $s\neq \varepsilon$.
+The label $\tau$ of a transition is written as $R,t:s$; $\tau$ is called an $R$-transition, {\em executed by} thread $t$, and the {\em execution of} statement $s$ when $s\neq\varepsilon$ and $s\notin\mathbb{N}$.
 The auxiliary predicate $\alienabled$ used in the premise of a rule determines whether a particular thread can execute.
 Formally, $\alienabledx t$ is true iff $\aliexecmode\in\{-1,t\}$. 
 The notation $\alivaluation \alievalx e t$ denotes the value of expression $e$ when each free variable $x$ is replaced with $\alivaluationx x$ and {\tt tid} is replaced with $t$.
+The components of the next state not mentioned in rules remain unchanged.
 
 
 \paragraph{Program runs.}
 A {\em run} of program $P$ is an alternating sequence of states and transition labels conforming to the operational semantics of Fig.~\ref{fig:operational-semantics}.
 Formally, a run $\alisequencex r$ is a sequence $q_0\tau_1q_1\ldots \tau_kq_k$, where $q_i$'s are states of $\aliltsx P$, $q_0=q_{init}$, and for each $i\in[1,k]$, $q_{i-1}\xrightarrow{\tau_i}q_i$ is a transition of $\aliltsx P$.
 The sequence of transitions $\tau_1\ldots \tau_k$ is called the {\em trace} of the run, denoted by $\alitracex {\alisequencex r}$.
+The state $q_i$ is called the $i^{th}$ state of $\alisequencex r$, also written as $\alisequencex r[i]$.
 The run is {\em failed} if $q_k.\aliexecmode=-2$.
 It is called {\em terminated} if $q_k.\alicontrolx t=\varepsilon$ for all $t$.
 A run that is either failed or terminated is {\em complete}.
@@ -361,14 +369,15 @@ Observe that we have not constrained the set of thread identifiers in the operat
 The {\em restriction} of $P$ to $T$, written $P[T]$, gives the set of all runs of $P$ in which each transition is executed by some thread $t\in T$. 
 
 A program run is {\em TSO-compliant} if it does not contain the {\sc \small Rd, Wr} transitions.
-Similarly, a program run is {\em SC-compliant} if it does not contain the {\sc \small WrB, WrM, RdB} and {\sc \small RdM} transitions.
+Similarly, a program run is {\em SC-compliant} if it does not contain the {\sc \small WrB, WrM, RdB, RdM} and {\sc \small Fnc} transitions.
 %For notational convenience we leave {\sc \small Fnc} rules in SC compliant runs.
-It is easy to show that in SC compliant runs {\alifence} and {\aliskip} are interchangeable. 
+%It is easy to show that in SC compliant runs {\alifence} and {\aliskip} are interchangeable. 
 Let $\alirunsx {tso} P$ denote the set of all TSO-compliant runs of $P$.
 Similarly, let $\alirunsx {sc} P$ denote the set of all SC-compliant runs of $P$.
 
 
 \begin{figure*}[th]
+{\small
 \[
 \alimemtracex {q,(Rl,t:s)} \stackrel{def}{=} 
  \begin{cases}
@@ -382,6 +391,7 @@ Similarly, let $\alirunsx {sc} P$ denote the set of all SC-compliant runs of $P$
   \varepsilon &,\ \textnormal{otherwise}
  \end{cases}
 \]
+}
 \caption{Mapping transitions to memory operations.}
 \label{fig:trans-to-memory}
 \end{figure*}
@@ -389,7 +399,6 @@ Similarly, let $\alirunsx {sc} P$ denote the set of all SC-compliant runs of $P$
 
 \paragraph{Memory traces.}
 In order to relate program runs to executions of the previous section, we define a mapping $\alimemtrace:\aliltsstatesx P\times\aliltstransitionsx P \rightarrow \tsoalph$ in Fig.~\ref{fig:trans-to-memory}.
-
 Let $\alisequencex r=q_0t_1q_1\ldots t_kq_k$ be a run.
 The memory trace of $\alisequencex r$ is the sequence $\alimemtracex {q_0,t_1}\cdot \alimemtracex {q_1,t_2} \cdot \ldots \cdot \alimemtracex {q_{k-1},t_k}$.
 With an abuse in notation, we let $\alimemtracex {\alisequencex r}$ denote the memory trace of $\alisequencex r$.
