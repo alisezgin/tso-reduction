@@ -165,9 +165,8 @@ In the remainder of this section, we informally summarize the highlights of the 
 \label{subsec:overview}
 %In this section we are going to walk through several examples illustrating the main concepts of our approach.
 %The discussion will be necessarily kept at a semi-formal level; all relevant formal definitions are given in the following sections.
-We start by explaining how one reasons about TSO programs using reduction.
-
-\paragraph{Reduction for TSO.}
+%We start by explaining how one reasons about TSO programs using reduction.
+\noindent{\it\textbf{Reduction for TSO}.}
 Consider a code snippet from a program with three threads:
 {\small
 \begin{eqnarray*} 
@@ -195,12 +194,12 @@ In the sample execution given above, since the read of $X$ by $u$ is not in $\ga
 On the other hand, the remote write $\remwritex u Y 2$ cannot move to the left of every action in $\gamma$ since it contains the read of $Y$ executed by $v$ whose observed value of 0 will not be consistent with TSO semantics when it is preceded by a memory update of $Y$ with 2. 
 Since a TSO execution has an equivalent SC execution only when all local and remote write actions can be put together without changing the read values, the above sequence is indeed non-SC.
 
-\paragraph{Write atomicity.}
+\noindent{\it \textbf{Write atomicity}.}
 The sample program has non-SC behavior, but even before attempting to turn it into a TRF program, we observe that the local and remote write actions due to the write by $t$ can always be put together, if for the moment we ignore the presence of $C_{t1}$ and $C_{t2}$; i.e. if we assume that $t$ executes only the write to $X$.
 This is because a local write action, which only updates the thread local state (changing buffer contents), moves to the right of every concurrent action without changing the overall behavior of the execution.
 The nice property of write atomicity is that, as we show, one can place a fence statement immediately after an atomic write statement, simplifying program analysis under TSO semantics, without restricting the overall behavior of the program.
 
-\paragraph{Removing triangular race.}
+\noindent{\it\textbf{Removing triangular race}.}
 For the sake of simplicity, assume that the value of $q$ is not subsequently used by $v$; i.e. $q$ is not read in $C_{v2}$.
 Then, we can obtain a new program by replacing the read of $Y$ with $q\mathtt{:=}\alihavocval$, which intuitively can assign any value to $q$.
 The behaviors of this new program subsumes the behaviors of the original program because of additional non-determinism. 
@@ -208,13 +207,13 @@ The fact that $Y$ is not read by $v$ in the new program immediately allows us to
 However, unlike the atomicity argument for the write of $X$ by $t$, the write to $Y$ is atomic because we can move $\remwritex u Y 2$ to the left of $\remwritex t X 1$, in turn because $\gamma$ does not contain the conflicting read of $Y$. 
 Here again we assumed that $C_{v1}$ and $C_{v2}$ do not exist which brings us to our next observation.
 
-\paragraph{Compositionality.}
+\noindent{\it\textbf{Compositionality}.}
 At this point we know that in the abstracted program, the write by $t$ is atomic because its local action is a right-mover (abstraction does not affect its atomicity argument), and the write by $u$ is atomic because its remote action is a left-mover.
 One of our results implies the write to $X$ remains atomic if the first action in $C_{t2}$ is a fence statement.
 Dually, the write to $Y$ remains atomic if the last action in $C_{v1}$ is a fence statement.
 Thus, analyzing write atomicity based on reduction allows us to make these distinctions in finding places for requiring fence statements.
 
-\paragraph{Program transformation and mechanical verification.}
+\noindent{\it\textbf{Program transformation and mechanical verification}.}
 Transforming TSO programs into equivalent SC programs usually entails embedding an array per thread, representing the local store buffer.
 Then, each write is inserted into this array and a non-deterministic loop, representing flushing of the contents of the store buffer, is placed between each statement of the original program.
 This encoding for us is not suitable because we want to explicitly check the mover types of local and remote writes. 
@@ -235,23 +234,23 @@ To summarize, in this paper we:
 \item propose a way to mechanically verify TRF.
 \end{itemize}
 
-\paragraph{Related work.}
-Program analysis under relaxed memory models has been a field of intense study, e.g. formalization of memory models~\cite{BA2008,BOS2011,HMS+2012,SSO+2010}, program logics for relaxed memory models~\cite{BDG2013,FFS2010,Rid2010,VN2013} or verification techniques~\cite{AKN+2013,BDM2013,BM2008,DMV+2013,ND2013}. 
+\noindent{\it\textbf{Related work}.}
+Program analysis under relaxed memory models has been a field of intense study, e.g. formalization of memory models~\cite{BA2008,BOS+2011,HMS+2012,SSO+2010}, program logics for relaxed memory models~\cite{BDG2013,FFS2010,Rid2010,VN2013} or verification techniques~\cite{AKN+2013,BDM2013,BM2008,DMV+2013,ND2013}. 
 In this discussion of related work, we focus only on research about TSO program analysis. % and discuss related work on model checking, fence insertion, reachability analysis for computational models, testing and monitoring only when the correctness criteria or underlying ideas are relevant to our work. 
 %Our technique is distinguished from this work fundamentally in that our proofs are valid for an arbitrary number of threads, memory addresses, or arbitrary (not necessarily finite domain) program variables and do not bound the length of the store buffer. 
 %Furthermore, our proofs cover the entire set of executions of a program and are not limited to a subset of interleavings defined, e.g., by bounding the number of context switches. 
 Our formal basis is derived from the abstract machine memory model described in the operational semantics of Owens et al.~\cite{OSS2009}. 
-Our work provides a static, mechanical checking method for and generalizes triangular race freedom (TRF) introduced by Owens~\cite{Owe2010}. 
+We provide a static, mechanical checking method for triangular race freedom (TRF) introduced by Owens~\cite{Owe2010}. 
 Unlike the latter, we propose a methodology to (mechanically) check TRF.
 TRF and the notion of TSO-robustness by Bouajjani et al.~\cite{BDM2013} are closely related. 
-Since our mechanical verification is SMT-based, it is not restricted, as is \cite{BDM2013} restricted, to finite state programs or a finite number of threads but involves potentially undecidable SMT queries. 
+Since our mechanical verification is SMT-based, it is not restricted, as is \cite{BDM2013}, to finite state programs or a finite number of threads but involves potentially undecidable SMT queries. 
 
-The use of code-to-code translation as a means for converting a verification task on a program running on a relaxed memory model to another verification task expressed on a sequentially consistent program is common in the literature (e.g., \cite{FBP2011,BDM2013,DMV+2013,AKN+2013}. 
+The use of code-to-code translation as a means for converting a verification task on a program running on a relaxed memory model to another verification task expressed on a sequentially consistent program is common in the literature (e.g., \cite{FBP2011,BDM2013,DMV+2013,AKN+2013}). 
 We do not consider code-to-code translation to be a verification technique in and of itself, rather, a mechanism for realizing a certain reduction from one problem to another. 
 In terms of the crux of the reduction, techniques differ widely. 
 Our code-to-code translation, by explicitly representing buffer flushes, enables us to use abstraction and reduction to prove triangular race freedom statically. 
 
-Automatic fence insertion into TSO programs to guarantee the absence of non-SC behaviors has enjoyed much interest (e.g.~\cite{AAC+2012,AAC+2013,BAM2007,FLM2003,LNP+2012,MVY2014,VN2011}).
+Automatic fence insertion into TSO programs to guarantee the absence of non-SC behaviors has enjoyed much interest (e.g.~\cite{AAC+2012,AAC+2013,BAM2007,FLM2003,LNP+2012,VN2011}).
 Even though we present several results about fence placement, we do not engage in an in-depth analysis which we leave as future work.
 %Our translation differs from others in that it is not limited to a given, fixed number of threads. 
 
@@ -265,7 +264,7 @@ Even though we present several results about fence placement, we do not engage i
 %Their technique assumes that non-interference between code segments has been verified separately and verifies code transformations under this assumption. 
 %Our work centers on verifying the desired non-interference under TSO. 
 
-\paragraph{Roadmap.}
+\noindent{\it\textbf{Roadmap}.}
 In Sec.~\ref{sec:formal-framework}, we develop the formal framework.
 In Sec.~\ref{sec:reduction-for-tso}, we introduce reduction theory for TSO programs.
 In Sec.~\ref{sec:abstracting-tso-programs}, we formalize the notion of abstraction for TSO programs and illustrate the methodology on a handshake based send/receive implementation.
@@ -390,30 +389,155 @@ All of this withstanding, reduction theory might prove to be an elegant tool to 
 \bibliographystyle{abbrvnat}
 \begin{thebibliography}{10}
 
+\bibitem{AAC+2012}
+P. A.~Abdulla, M. F.~Atig, Y. F.~Chen, C.~Leonardsson and A.~Rezine.
+\newblock Automatic fence insertion in integer programs via predicate abstraction.
+\newblock In {\em SAS}, pages(164-180), 2012.
+
+\bibitem{AAC+2013}
+P. A.~Abdulla, M. F.~Atig, Y. F.~Chen, C.~Leonardsson and A.~Rezine.
+\newblock Memorax, a Precise and Sound Tool for Automatic Fence Insertion under TSO.
+\newblock In {\em TACAS}, pages(530-536), 2013.
+
+\bibitem{AKN+2013}
+J.~Alglave, D.~Kroening, V.~Nimal and M.~Tautschnig.
+\newblock   Software Verification for Weak Memory via Program Transformation.
+\newblock In {\em ESOP}, pages(512-532), 2013.
+
+\bibitem{BDG2013}
+M.~Batty, M.~Dodds and A.~Gotsman.
+\newblock Library abstraction for C/C++ concurrency.
+\newblock In {\em POPL}, pages(235-248), 2013.
+
+\bibitem{BOS+2011}
+M.~Batty, S.~Owens, S.~Sarkar, P.~Sewell and T.~Weber.
+\newblock Mathematizing C++ concurrency.
+\newblock In {\em POPL}, pages(55-66), 2011.
+
+\bibitem{BA2008}
+H.J.~ Boehm and S.V.~Adve.
+\newblock Foundations of the C++ concurrency memory model.
+\newblock In {\em PLDI}, pages(68-78), 2008.
+
+\bibitem{BDM2013}
+A.~Bouajjani, E.~Derevenetc and R.~Meyer.
+\newblock Checking and Enforcing Robustness against TSO.
+\newblock In {\em ESOP}, pages(533-553), 2013.
+
+\bibitem{BAM2007}
+S.~Burckhardt, R.~Alur, and M.~Martin.
+\newblock CheckFence: Checking consistency of concurrent data types on relaxed memory models.
+\newblock In {\em PLDI}, pages(12-21), 2007.
+
+\bibitem{BM2008}
+S.~Burckhardt and M.~Musuvathi.
+\newblock Effective program verification for relaxed memory models.
+\newblock In {\em CAV}, pages(107-120), 2008.
+
+\bibitem{DMV+2013}
+A.~Dan, Y.~Meshman, M.~Vechev and E.~Yahav.
+\newblock Predicate Abstraction for Relaxed Memory Models.
+\newblock In {\em SAS}, pages(84-104), 2013.
+
 \bibitem{EQT2009}
 T.~Elmas, S.~Qadeer, and S.~Tasiran.
 \newblock A calculus of atomic actions.
 \newblock In {\em POPL}, pages(2-15), 2009.
 
-\bibitem{Lam1979}
-L. Lamport.
-\newblock How to make a multiprocessor computer that correctly executes multiprocess programs.
-\newblock In {\em IEEE Trans. Comp.}, C-28(9): pages(690–691), 1979.
+\bibitem{FLM2003}
+X. Fang, J. Lee, and S. Midkiff.
+\newblock Automatic fence insertion for shared memory multiprocessing.
+\newblock In {\em ICS}, pages(285-294), 2003.
 
-\bibitem{AG1996}
-S.~Adve and K.~Gharachorloo.
-\newblock Shared memory consistency models: a tutorial.
-\newblock In {\em Computer}, 29(12): pages(66–76), 1996.
+\bibitem{FBP2011}
+M.~Faouzi, A.~Bouajjani and G.~Parlato.
+\newblock Getting Rid of Store-Buffers in TSO Analysis.
+\newblock In {\em CAV}, pages (99-115), 2011.
+
+\bibitem{FFS2010}
+R.~Ferreira, X.~Feng and Z.~Shao.
+\newblock Parameterized memory models and concurrent separation logic.
+\newblock In {\em ESOP}, pages(267-286), 2010.
+
+\bibitem{HMS+2012}
+S.M.~Haim, L.~Maranget, S.~Sarkar, K.~Memarian, J.~Alglave, S.~Owens, R.~Alur, M.M.K.~Martin, P.Sewell and D.~Williams.
+\newblock An axiomatic memory model for POWER multiprocessors.
+\newblock In {\em CAV}, pages(495-512), 2012.
+
+\bibitem{JLP+2014}
+S.~Jagannathan, V.~Laporte, G.~Petri, D.~Pichardie and J.~Vitek.
+\newblock Atomicity refinement for verified compilation.
+\newblock In {\em PLDI}, pages(27-27), 2014.
+
+\bibitem{KPH2010}
+E.~Koskinen, M.~Parkinson and M.~Herlihy.
+\newblock Coarse-grained transactions.
+\newblock In {\em POPL}, pages(19-30), 2010.
+
+\bibitem{Lip1975}
+R.J.~Lipton.
+\newblock Reduction: a method of proving properties of parallel programs.
+\newblock In {\em CACM}, pages(717-721), 1975.
+
+\bibitem{LNP+2012}
+F.~Liu, N.~Nedev, N.~Prisadnikov, M.~Vechev and E.~Yahav.
+\newblock Dynamic synthesis for relaxed memory models. 
+\newblock In {\em PLDI}, pages(429-440), 2012.
+
+\bibitem{ND2013}
+B.~Norris and B.~Demsky.
+\newblock CDSchecker: checking concurrent data structures written with C/C++ atomics
+\newblock In {\em OOPSLA}, pages(131-150), 2013.
+
+\bibitem{Owe2010}
+S.~Owens.
+\newblock Reasoning about the implementation of concurrency abstractions on x86-TSO.
+\newblock In {\em ECOOP}, 2010.
+
+\bibitem{OSS2009}
+S.~Owens, S.~Sarkar and P~Sewell.
+\newblock A better x86 memory model: x86-TSO.
+\newblock In {\em TPHOLs}, pages(391-407), 2009.
+
+\bibitem{Rid2010}
+T.~Ridge
+\newblock A Rely-Guarantee proof system for x86-TSO.
+\newblock In {\em VSTTE}, pages(55-70), 2010.
+
+\bibitem{RD1997}
+M.C.~Rinard and P.C.~Diniz.
+\newblock Commutativity analysis: a new analysis technique for parallelizing compilers.
+\newblock In {\em TOPLAS}, pages(942-991), 1997.
+
+\bibitem{SSO+2010}
+P.~Sewell, S.~Sarkar, S.~Owens, F.Z.~Nardelli and M.O.~Myreen.
+\newblock x86-TSO: a rigorous and usable programmer's model for x86 multiprocessors.
+\newblock In {\em CACM}, pages(89-97), 2010.
+
+\bibitem{VN2013}
+V.~Vafeiadis and C.~Narayan.
+\newblock Relaxed separation logic: a program logic for C11 concurrency.
+\newblock In {\em OOPSLA}, pages(867-884), 2013.
+
+\bibitem{VN2011}
+V.~Vafeiadis and F.Z.~Nardelli.
+\newblock Verifying fence elimination optimisations.
+\newblock In {\em SAS}, pages(146-162), 2011.
+
+
+
+\COMMENT{
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+\bibitem{EQT2009}
+T.~Elmas, S.~Qadeer, and S.~Tasiran.
+\newblock A calculus of atomic actions.
+\newblock In {\em POPL}, pages(2-15), 2009.
 
 \bibitem{SJM+2007}
 V.A.~Saraswat, R.~Jagadeesan, M.~Michael and C.~Von Praun.
 \newblock A theory of memory models.
 \newblock In {\em PPoPP}, ACM: pages(161-172), 2007.
-
-\bibitem{Hil1998}
-M.~Hill.
-\newblock Multiprocessors should support simple memory-consistency models.
-\newblock In {\em IEEE Computer}, 31(8): pages(28–34), 1998.
 
 \bibitem{OSS2009}
 S.~Owens, S.~Sarkar and P~Sewell.
@@ -685,7 +809,7 @@ J.~Sevcik, V.~Vafeiadis, S.~Jagannathan and P.~Sewell.
 \newblock CompCertTSO: A Verified Compiler for Relaxed-Memory Concurrency.
 \newblock In {\em JACM}, 2013.
 
-
+}
 
 
 \end{thebibliography}

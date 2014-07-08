@@ -261,7 +261,7 @@ The restriction to singular runs is to avoid complex characterization of canonic
 
 \begin{figure*}[ht]
 {\small
-\begin{tabular}{p{.2\textwidth}|p{.24\textwidth}p{.24\textwidth}|p{.24\textwidth}}
+\begin{tabular}{p{.2\textwidth}|p{.24\textwidth}p{.24\textwidth}|p{.26\textwidth}}
 \begin{alltt}DoubleCheckInit() 
  r:=\(Obj\);
  \(\aliif\) r=0 \(\alithen\) 
@@ -306,8 +306,7 @@ The restriction to singular runs is to avoid complex characterization of canonic
  else r:=\(\alihavocval\);
  \(\aliif\) r=0 \(\alithen\) 
    \(\aliatomic\) 
-     \(\aliassume\) {\(Lck\)=0}; 
-     \(Lck\):=tid; 
+     \(\aliassume\) {\(Lck\)=0}; \(Lck\):=tid; 
      \(\alifence\);
   r:=\(Obj\);
   \(\aliif\) r=0 \(\alithen\) 
