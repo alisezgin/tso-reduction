@@ -8,21 +8,27 @@ In this section, we go one step further and show abstraction can be used to turn
 %The use of abstraction in reduction was successfully demonstrated in~\cite{EQT2009} in the context of sequentially consistent programs.
 %Since the soundness of the method crucially depends on the atomicity of each action, it was not clear how one can adopt those techniques to weaker memory models.
 %Here we address and resolve the issue of non-atomic writes for TSO.
-In order to define program abstraction, we need to define a new equivalence relation among TSO runs.
+%In order to define program abstraction, we need to define a new equivalence relation among TSO runs.
 %The idea is to make sure that equivalent runs have identical computations even though they might have different statements.
-Let us call two TSO-runs of equal length $\alisequencex r$ and $\alisequencex {r'}$ {\em computationally equal}, written $\alisequencex r \alicompequiv \alisequencex {r'}$, if for all $i$, $\tau[i]=R,t:s$ and $\tau'[i]=R',t':s'$  imply $R=R'$, $t=t'$, $s$ and $s'$ have the same label, expressions in both $s$ and $s'$ evaluate to the same value, and in the case of an assignment, the left hands are the same.
+Let us call two TSO-runs $\alisequencex r$ and $\alisequencex {r'}$ {\em computationally equal} if there are two sequences of increasing index values, $i_1\ldots i_m$ and $j_1\ldots j_m$ over the state indices that occur in $\alisequencex r$ and $\alisequencex {r'}$ such that $i_1=j_1=0$, $i_m=\alilenx {\alisequencex r}$, $j_m=\alilenx {\alisequencex {r'}}$, for all $1\leq n\leq m$ we have $q_{i_n}=q'_{j_n}$, and all transitions from $q_{i_n}$ to $q_{i_{n+1}}$ and from $q'_{j_n}$ to $q'_{j_{n+1}}$ are executed by the same thread.
 Intuitively, computationally equal runs will result in identical execution paths, even though there may be syntactic differences between the executed statements.
+
 \begin{definition}[Program Abstraction]
 Let $P$ and $P'$ be two programs.
 We say that $P'$ {\em abstracts} $P$, if one of the following holds:
 \begin{itemize}
 \item $P'$ has a failed run, or
-\item $P$ does not have a failed run and for each terminated run $\alisequencex r\in\alirunsx {tso} P$, there exists a terminated run $\alisequencex {r'}\in\alirunsx {tso} {P'}$ such that $\alisequencex r\alicompequiv \alisequencex {r'}$.
+\item $P$ does not have a failed run and for each terminated run $\alisequencex r\in\alirunsx {tso} P$, there exists a terminated run $\alisequencex {r'}\in\alirunsx {tso} {P'}$ computationally equal to $\alisequencex r$.
 \end{itemize}
 \end{definition}
 Intuitively, $P'$ abstract $P$ if $P'$ contains an assertion violation or has more behaviors than $P$.
 This means that if $P'$ can be proven to contain no assertion violations, then neither does $P$.
 We should note that the other direction, that when $P$ does not contain an assertion violation neither should $P'$, does not hold in general.
+
+Abstraction works as follows.
+Assume that we have a program $P$ with TSO-specific runs.
+We construct an abstraction $P'$ of $P$ such that if $\alisequencex r$ is a TSO-specific run of $P$, then there will be a run $\alisequencex {r'}$ of $P'$ computationally equal to $\alisequencex r$ such that $\alisequencex {r'}$ is SC-like.
+As we shall see computationally equal allows us to remove dependencies between memory reads and writes by abstracting one or both.
 
 \begin{table}
 \begin{tabular}{ll}
@@ -57,28 +63,29 @@ In Table~\ref{tab:abs-rules}, we list two such possible rules which are essentia
 %In this case, the assume statement with a weaker predicate will allow for more behaviors.
 
 The first rule, {\aliabsrulex {ValNondet}}, introduces non-deterministic reads or writes.
-Let $\alihavocval$ be an expression that can evaluate to any integer value.
-\footnote{Essentially, with the introduction of $\alihavocval$ we are changing the evaluation operator $\alieval$ from a mapping from expressions to values to a mapping from expression to sets of values.}
+Let $\alihavocval$ be a special notation to denote an expression that can evaluate to any integer value.
+\footnote{Essentially, with the introduction of $\alihavocval$ we are changing the evaluation operator $\alieval$ from a mapping from expressions to values to a mapping from expressions to sets of values.}
 Then replacing any expression with $e$ with $\alihavocval$ is another abstraction.
 
 The other rule {\aliabsrulex {CtrlNondet}}, introduces non-deterministic control flow.
 The idea is to replace a statement $s$ by an if-then-else statement such that the branches are not necessarily mutually exclusive, i.e. certain states may satisfy both $e$ and $e'$ of the rule in Table~\ref{tab:abs-rules}.
-This is a sound abstraction because no matter which branch is taken (and at any state at least one of these branches are enabled) whatever $s$ was doing, possibly more, in the original program will be done.  
+This is a sound abstraction because no matter which branch is taken (and at any state at least one of these branches is enabled) whatever $s$ in the original program was doing, and possibly more, will be done by its replacement, $s'$ or $s''$ both of which are abstractions of $s$.  
 For a detailed exposition of how abstraction in conjunction with reduction leads to a natural style of reasoning in safety proofs, the reader can consult~\cite{EQT2009}.
 
 \paragraph{Why it works?}
-Before going into examples, let us briefly discuss how abstraction leads to an SC-like program. 
-Consider the template of a triangular race as given in~\cite{Owe2010} below:
+Before going into examples, let us briefly discuss how abstraction based on the above rules leads to an SC-like program. 
+Consider the triangular race as given in~\cite{Owe2010} below:
 \begin{eqnarray*}
 &\locwritex t A 1 \cdot \alireadx t B 0 \cdot \locwritex u B 2 \cdot \remwritex u B 2\\
 &\ \cdot\ \alireadx v B 2 \cdot \alireadx v A 0 \cdot \remwritex t A 1
 \end{eqnarray*}
 In this TSO-execution, $t$ observes the initial value for $B$, whereas $v$ observes the write to $B$ by $u$ before the write to $A$ by $t$ because the remote write action of $t$ comes after both of the reads of $v$.
 In order to construct an equivalent SC-execution, both statements of $t$ should precede the statement of $u$ because the read of $B$ by $t$ returns the initial value 0.
-However, for the reads of $v$ to be consistent the write to $B$ should occur before the write to $A$, which contradicts the previous requirement.
+However, the first read of $B$ by $v$ should come before the write to $B$ by $u$ followed by second read of $A$ by $v$ which in turn should be follwed by the write to $A$ by $t$.
+These two requirements contradict, hence no equivalent SC-like execution exists.
 
-Looking more closely into the execution, we see that it is impossible to make the write to $A$ by $t$ atomic. 
-Recall that for a local and remote write pair to be atomic, it must be possible to partition into two the sequence of actions that separate the two write actions such that the local write moves to the right of every action of the left partition and the remote write moves to the left of every action of the right partition.
+Looking more closely into the execution, we see that it is impossible to make the local write to $A$ by $t$ synchronous. 
+Recall that by Thm.~\ref{thm:completeness}, for $\locwritex t A 1$ to be synchronous, it must be possible to partition a permutation of the sequence of actions that separate the two write actions into two such that the local write moves to the right of every action of the left partition and the remote write moves to the left of every action of the right partition.
 In the given memory trace, $\locwritex t A 1$ is a right-mover but is followed by a read of $B$ which cannot move to the right of $\remwritex u B 2$.
 This implies that $\remwritex t A 1$ should move to the left of every action up to $\locwritex u B 2$.
 But this is impossible because it cannot move to the left of $\alireadx v A 0$.
@@ -96,8 +103,9 @@ which can be brought into an atomic equivalent form as:
 &\locwritex u B 2 \cdot \remwritex u B 2\\
 &\ \cdot\ \alireadx v B 2 \cdot \alireadx v A 0 \cdot \locwritex t A 1 \cdot \remwritex t A 1
 \end{eqnarray*}
+Observe that even though the memory traces before and after the abstraction are different, the underlying runs will be computationally equal.
 Of course, this is a simple example where the read value by $t$ is not used, so the abstraction might make sense trivially. 
-We next work through several simple templates which demonstrate the power of abstraction: transforming a program into one that is SC-like which can be used to prove safety properties of interest.
+We next work through an example which demonstrate the power of abstraction: transforming a program into one that is SC-like which can be used to prove safety properties of interest.
  
 \subsection{Send/Receive}
 \label{subsec:send-receive}
@@ -132,7 +140,7 @@ The receiver begins by setting $Rdy$ (initially 0) to 1 to tell the sender that 
 Before spinning on $Flag$, the receiver reads the current content of $Buf$ (0 means message not in yet).
 If it observes a non-zero value denoting a valid message, it skips the entire spinning block.
 Otherwise, it spins on $Flag$ and after observing it to be equal to 1, it reads the message from $Buf$.
-Let us consider the set of TSO programs in which two threads $t$ and $u$ run {\tt Recv} and {\tt Send(42)} respectively.
+Let us consider the set of TSO runs in which two threads $t$ and $u$ run {\tt Recv} and {\tt Send()} respectively.
 
 \paragraph{Triangular race.}
 This program does have a triangular race depicted by the following memory trace
@@ -158,44 +166,50 @@ We claim that in the new abstract program $P'$ the write to $Rdy$ by {\tt Recv} 
 %In order to prove this claim we have to show that the memory trace of any run of $P'$ has an equivalent SC-execution.
 Let $\alisequencex r$ be a run in $\alirunsx {tso} {P'}$ whose memory trace is of the form
 \[
-\alpha\cdot\ \locwritex t {Rdy} 1\cdot\ \tau\cdot\ \remwritex t {Rdy} 1\cdot\ \beta
+\alpha\cdot\ \locwritex t {Rdy} 1\cdot\ \gamma\cdot\ \remwritex t {Rdy} 1\cdot\ \beta
 \]
 where $\alpha$, $\tau$ and $\beta$ are sequences of memory actions.
-We have to show that there are sequences of actions $\tau_1$ and $\tau_2$ such that $\tau=\tau_1\tau_2$, $\locwritex t {Rdy} 1$ moves to the right of every action in $\tau_1$, and $\remwritex t {Rdy} 1$ moves to the left of every action in $\tau_2$. 
-We set $\tau_1=\tau$ and $\tau_2=\varepsilon$ and show that the following memory trace belongs to a run of $P'$.
-\[
-\alpha\cdot\ \tau\cdot\ \locwritex t {Rdy} 1\cdot\ \remwritex t {Rdy} 1\cdot\ \beta
-\]
+We have to show that there exists another run $\alisequencex {r'}$ of $P'$ computationally equal to $\alisequencex r$  in which the write to $Rdy$ is atomic.
+%\[
+%\alpha\ \cdot\ \gamma_1\ \cdot\ \locwritex t {Rdy} 1\ \cdot\ \ \remwritex t {Rdy} 1\ \cdot\ \gamma_2\ \cdot\ \beta
+%\]
+%We set $\gamma_2$ to contain all local actions executed by $t$ in $\gamma$.
+%The sequence $\gamma_1$ will contain all memory actions of $\gamma$ except possibly a read of $Rdy$ executed by $u$.
+%We have to show that there are sequences of actions $\tau_1$ and $\tau_2$ such that $\tau=\tau_1\tau_2$, $\locwritex t {Rdy} 1$ moves to the right of every action in $\tau_1$, and $\remwritex t {Rdy} 1$ moves to the left of every action in $\tau_2$. 
+%We set $\tau_1=\tau$ and $\tau_2=\varepsilon$ and show that the following memory trace belongs to a run of $P'$.
+%\[
+%\alpha\cdot\ \tau\cdot\ \locwritex t {Rdy} 1\cdot\ \remwritex t {Rdy} 1\cdot\ \beta
+%\]
 
-First, observe that $\tau_1$ cannot contain the write to $Flag$ by $u$ because that action only happens when $u$ ends its spinning by reading 1 from $Rdy$ which can only happen in $\beta$, i.e. after the remote write action $\remwritex t {Rdy} 1$.
-This in turn means that the farthest $t$ can go in $\tau$ is the reading of $Flag$.
+First, observe that $\gamma$ cannot contain the write to $Flag$ by $u$ because that action only happens when $u$ ends its spinning by reading 1 from $Rdy$ which can only happen in $\beta$, i.e. after the remote write action $\remwritex t {Rdy} 1$.
+This in turn means that the farthest $t$ can go in $\gamma$ is the reading of $Flag$.
 Any read action is a right (and left) mover with respect to another action not writing to the location read.
-Thus, in case $\tau_1$ contains read(s) of $Flag$ they can all move to right until $\remwritex t {Rdy} 1$.
+Thus, in case $\gamma$ contains read(s) of $Flag$ they can all move to right of $\remwritex t {Rdy} 1$.
 
 Since a local write action is always a right mover, we are left with the read of $Buf$ by $t$.
-If the remote write action $\remwritex u {Buf} d$ is not in $\tau$, then we are done.
-Assume that \remwritex u {Buf} d happens after some prefix $\tau_p$ of $\tau$, i.e.
+If the remote write action $\remwritex u {Buf} d$ is not in $\gamma$, then we are done.
+Assume that \remwritex u {Buf} d happens after some prefix $\gamma_p$ of $\gamma$, i.e.
 \[
-\alpha\cdot\ \locwritex t {Rdy} 1\cdot\ \tau_p\cdot\ \remwritex u {Buf} d\cdot\ \tau_q\cdot\ \remwritex t {Rdy} 1\cdot\ \beta
+\alpha\cdot\ \locwritex t {Rdy} 1\cdot\ \gamma_p\cdot\ \remwritex u {Buf} d\cdot\ \gamma_q\cdot\ \remwritex t {Rdy} 1\cdot\ \beta
 \]
-If the read of $Buf$ by $t$ happens in $\tau_q$, we are done.
-So assume that the read of $Buf$ happens in $\tau_p$.
+If the read of $Buf$ by $t$ happens in $\gamma_q$, we are done.
+So assume that the read of $Buf$ happens in $\gamma_p$.
 Since it happens before the remote write action, the state at which the abstract read statement occurs must have $Buf=0$.
-According to the abstraction, this means that the {\tt then} branch must have been taken, which sets $\aliregx 2$ to 0.
-If the read action moves to the right of $\remwritex u {Buf} d$, then because $Buf\neq 0$ holds after the remote write, the {\tt else} branch will be taken instead.
+According to the abstraction, this means that the {\tt then} branch must have been taken, which sets $\aliregx 2$ to 0 (by reading the contents of $Buf$).
+If the abstracted statement moves is executed after $\remwritex u {Buf} d$, then because $Buf\neq 0$ holds after the remote write, the {\tt else} branch will be taken instead.
 That in turn implies that $\aliregx 2$ can be assigned any value, including 0. 
 So, the sequence
 \[
-\alpha\cdot\ \cdot\ \tau_p'\cdot\ \remwritex u {Buf} d\cdot\ \tau_q'\cdot\ \locwritex t {Rdy} 1\cdot\ \remwritex t {Rdy} 1\cdot\ \beta
+\alpha\ \cdot\ \gamma_p'\cdot\ \remwritex u {Buf} d\cdot\ \gamma_q'\cdot\ \locwritex t {Rdy} 1\cdot\ \remwritex t {Rdy} 1\cdot\ \gamma_2\ \cdot\ \beta
 \]
-where $\tau_p'$ does not contain any action by $t$ is also a memory trace of $P'$.
-Since $\tau$ was taken to be arbitrary, we conclude that the write to $Rdy$ by $t$ is atomic.
+where $\gamma_p'$ does not contain any action by $t$ is also a memory trace of $P'$.
+Since $\gamma$ was taken to be arbitrary, we conclude that the write to $Rdy$ by $t$ is atomic.
 
 \paragraph{Execution context.}
 Observe that our argument also establishes the remote write action to $Buf$ as a left mover. 
 However, there is a fundamental difference between the two arguments.
-Since we proved the atomicity of the write to $Rdy$ by showing that all actions of $t$ until the remote write action to $Rdy$ occurs are right-movers, our result does not depend on the client's state, in particular the store buffer state. 
-On the other hand, because our argument for the atomicity of the write to $Buf$ is based on showing that its remote write action is a left-mover, the result depends on the client's store buffer state. 
-For instance, if both threads' buffers contained remote write actions to the same location before calling {\tt Recv} and {\tt Send} then we will not be able to move the remote write to $Buf$ next to its matching local write.
-In other words, if one wants to have atomicity of these writes in any execution context, {\tt Recv} must end with a fence whereas {\tt Send} must begin with a fence.
+Since we proved the atomicity of the write to $Rdy$ by showing that all actions of $t$ until the remote write action to $Rdy$ occurs are right-movers, the result there being no other local actions by $t$ until the remote write action occurs. 
+On the other hand, because our argument for the atomicity of the write to $Buf$ is based on showing that its remote write action is a left-mover, the result depends on the contents of the store buffer. 
+%For instance, if both threads' store buffers contained write actions to the same location before calling {\tt Recv} and {\tt Send} then we will not be able to move the remote write to $Buf$ next to its matching local write.
+In other words, if one wants to have atomicity of these writes in any execution context, {\tt Recv} must end with a fence whereas {\tt Send} must begin with a fence, in accordance with the compositionality results, Thm.~\ref{thm:after-fence} and Thm.~\ref{thm:before-fence}, respectively.
 

@@ -97,11 +97,11 @@ Unlike SC semantics where atomicity of methods carry over to arbitrary execution
 We let {\em non-interfering execution context} for $P$ denote any program $P'$ which does not access any location that $P$ does.
 We will now state our main compositionality results.
 
-\begin{theorem}[Compositionality-Remote]
+\begin{theorem}[Compositionality-Remote]\label{thm:after-fence}
 Let $m$ be a method in $P$ such that all of its write statements are proved atomic by showing that its remote write actions are left-movers.
 Then, $m$ remains atomic in any non-interfering execution context for $P$ which executes a fence statement every time $m$ completes and returns.
 \end{theorem}
-\begin{theorem}[Compositionality-Local]
+\begin{theorem}[Compositionality-Local]\label{thm:before-fence}
 Let $m$ be a method in $P$ such that all of its write statements are proved atomic by showing that its local actions are right-movers.
 Then, $m$ remains atomic in any non-interfering execution context which executes a fence statement before each call to $m$.
 \end{theorem}

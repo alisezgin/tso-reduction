@@ -1,6 +1,7 @@
 % !TEX root = main-tsoreduction.tex
 
 \begin{figure*}[th]
+{\small
 \begin{mathpar}
 \fbox{$(\alicontrol,\alivaluation,\alibuffer,\aliexecmode)\xrightarrow{Rl,t:s}(\alicontrol',\alivaluation',\alibuffer',\aliexecmode')$}\\
 
@@ -100,6 +101,7 @@ s=\varepsilon \\ \aliexecmode=t}
 \alivaluation{\alievalx e}t=\alitrue \\ s=\aliassumex{e} \\ \alienabledx t}
 {\alicontrol'=\alicontrol[t\mapsto \alisequencex l \cdot \alisuccx {l'}]}
 \end{mathpar}
+}
 \caption{Operational semantics for TSO and SC.}
 \label{fig:operational-semantics}
 \end{figure*}
